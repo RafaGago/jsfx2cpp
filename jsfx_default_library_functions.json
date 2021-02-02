@@ -1,0 +1,253 @@
+{
+    "max" :  {"to": "std::max",  "headers": ["algorithm"]},
+    "min" :  {"to": "std::min",  "headers": ["algorithm"]},
+    "pow" :  {"to": "std::pow",  "headers": ["cmath"]},
+    "exp" :  {"to": "std::exp",  "headers": ["cmath"]},
+    "sqrt":  {"to": "std::sqrt", "headers": ["cmath"]},
+    "sin" :  {"to": "std::sin",  "headers": ["cmath"]},
+    "cos" :  {"to": "std::cos",  "headers": ["cmath"]},
+    "ceil":  {"to": "std::ceil", "headers": ["cmath"]},
+    "floor": {"to": "std::ceil", "headers": ["cmath"]},
+    "log" :  {"to": "std::log",  "headers": ["cmath"]},
+    "abs" :  {"to": "std::fabs", "headers": ["cmath"]},
+    "rand": {
+        "to": "jsfx_rand",
+        "headers": ["cstdlib", "limits", "cstdint"],
+        "definition" : [
+            "static double jsfx_rand() {",
+            "  return (double) std::rand();",
+            "}",
+            "static double jsfx_rand (double maxv) {",
+            "  return (double) (std::rand() % (uint64_t) maxv);",
+            "}"
+        ]
+    },
+    "spl": {
+        "to": "jsfx_spl",
+        "headers": [],
+        "definition" : [
+            "double& jsfx_spl (double num) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "slider": {
+        "to": "jsfx_slider",
+        "headers": [],
+        "definition" : [
+            "double& jsfx_spl (double num) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "slider_next_chg": {
+        "to": "jsfx_slider_next_chg",
+        "headers": [],
+        "definition" : [
+            "void slider_next_chg (double sliderindex, double nextval) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "midisend": {
+        "to": "jsfx_midisend",
+        "headers": [],
+        "definition" : [
+            "void jsfx_midisend (double offset, double msg1, double msg2) {",
+            "  /* TODO: stub, implement */",
+            "}",
+            "void jsfx_midisend (double offset, double msg1, double msg2, double msg3) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "midisend_buf": {
+        "to": "jsfx_midisend_buf",
+        "headers": [],
+        "definition" : [
+            "void jsfx_midisend_buf (double offset, double buf, double len) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "midisend_str": {
+        "to": "jsfx_midisend_str",
+        "headers": [],
+        "definition" : [
+            "void jsfx_midisend_str (double offset, const char* str) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "midirecv": {
+        "to": "jsfx_midirecv",
+        "headers": [],
+        "definition" : [
+            "void jsfx_midirecv (double offset, double& msg1, double& msg2, double& msg3) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "midirecv_buf": {
+        "to": "jsfx_midirecv_buf",
+        "headers": [],
+        "definition" : [
+            "void jsfx_midirecv_buf (double offset, double buf, double maxlen) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "midirecv_str": {
+        "to": "jsfx_midirecv_str",
+        "headers": [],
+        "definition" : [
+            "void jsfx_midirecv_str (double offset, char const*& dst, double maxlen) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "midisyx": {
+        "to": "jsfx_midisyx",
+        "headers": [],
+        "definition" : [
+            "void jsfx_midisyx (double offset, double msgptr, double len) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "mdct": {
+        "to": "jsfx_mdct",
+        "headers": [],
+        "definition" : [
+            "void jsfx_mdct (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "imdct": {
+        "to": "jsfx_imdct",
+        "headers": [],
+        "definition" : [
+            "void jsfx_imdct (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "fft": {
+        "to": "jsfx_fft",
+        "headers": [],
+        "definition" : [
+            "void jsfx_fft (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "ifft": {
+        "to": "jsfx_ifft",
+        "headers": [],
+        "definition" : [
+            "void jsfx_ifft (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "fft_real": {
+        "to": "jsfx_fft_real",
+        "headers": [],
+        "definition" : [
+            "void jsfx_fft_real (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "ifft_real": {
+        "to": "jsfx_ifft_real",
+        "headers": [],
+        "definition" : [
+            "void jsfx_ifft_real (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "fft_permute": {
+        "to": "jsfx_fft_permute",
+        "headers": [],
+        "definition" : [
+            "void jsfx_fft_permute (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "fft_ipermute": {
+        "to": "jsfx_fft_ipermute",
+        "headers": [],
+        "definition" : [
+            "void jsfx_fft_ipermute (double start_index, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "convolve" : {
+        "to": "jsfx_convolve",
+        "headers": [],
+        "definition" : [
+            "void jsfx_convolve (double dst, double src, double size) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "freembuf" : {
+        "to": "jsfx_freembuf",
+        "headers": [],
+        "definition" : [
+            "void jsfx_freembuf (double top) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "_memtop" : {
+        "to": "jsfx_memtop",
+        "headers": [],
+        "definition" : [
+            "double jsfx_memtop() {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "stack_push" : {
+        "to": "jsfx_stack_push",
+        "headers": [],
+        "definition" : [
+            "double jsfx_stack_push (double value) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "stack_pop" : {
+        "to": "jsfx_stack_pop",
+        "headers": [],
+        "definition" : [
+            "double jsfx_stack_pop (double value) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "stack_peek" : {
+        "to": "jsfx_stack_peek",
+        "headers": [],
+        "definition" : [
+            "double jsfx_stack_peek (double index) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    },
+    "stack_exch" : {
+        "to": "jsfx_stack_exch",
+        "headers": [],
+        "definition" : [
+            "double jsfx_stack_exch (double value) {",
+            "  /* TODO: stub, implement */",
+            "}"
+        ]
+    }
+}

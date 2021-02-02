@@ -1,0 +1,4 @@
+@init
+// this snippet used to fail
+
+j = call(16.0);

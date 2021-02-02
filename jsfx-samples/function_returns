@@ -1,0 +1,10 @@
+function f()(
+    x < 3 ? 0 : 1;
+);
+
+function g()(
+    loop(32,
+        r += b;
+        b = var * 1.5;
+      );
+);

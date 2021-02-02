@@ -1,0 +1,16 @@
+@init
+// r1 = 1, r2 = 2
+function v() instance (x)
+(
+  x + 1;
+);
+
+function v2(y) instance (x)
+(
+  x = y;
+);
+
+// has to pass a$x by ref
+r1 = a.v2(1); // r1 = 1, a$x = 1
+// has to pass a$x by ref
+r2 = a.v(); // r2 = 2, a$x = 2

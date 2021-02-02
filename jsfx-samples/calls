@@ -1,0 +1,19 @@
+// checking for correct call namespacing
+@init
+function f1()(
+   this.x = 1;
+);
+function f2()(
+    this.x = 2;
+);
+f2(); /* has to call init::f2 */
+a.f2(); /* has to call init::f2 */
+@block
+function f2()(
+    this.x = 3;
+);
+
+f1(); /* has to call init::f1 */
+a.f1(); /* has to call init::f1 */
+f2(); /* has to call block::f1 */
+b.f2(); /* has to call block::f1 */

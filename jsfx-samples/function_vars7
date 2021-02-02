@@ -1,0 +1,13 @@
+@init
+function addx()(
+  this.x = 6;
+);
+
+function f1() local(x)(
+  x.y = 4;
+  x.z = 3;
+  x.addx();
+);
+
+f1(); // x.x = 6, x.y = 4, x.z = 3;
+a.f1(); // x.x = 6, x.y = 4, x.z = 3; (nothing new)

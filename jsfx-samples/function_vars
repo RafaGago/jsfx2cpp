@@ -1,0 +1,13 @@
+@init
+// this expects _a.y.x = 3 so this program needs to generate a variable
+// "_a.y.x" on the calling scope.
+
+function _f1() instance (x)(
+	x = 3;
+);
+
+function _f2() instance (y)(
+	y._f1();
+);
+
+_a._f2();

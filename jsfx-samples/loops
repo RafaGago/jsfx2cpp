@@ -1,0 +1,52 @@
+@init
+loop(32,
+  r += b;
+  b = var * 1.5;
+);
+
+while ( a < 1000 ) (
+  a += b;
+  b *= 1.5;
+);
+
+while(
+    a += b;
+    b *= 1.5;
+    a < 1000; // as long as a is below 1000, we go again.
+);
+
+x = loop(32, r += b;);
+
+// loops are assignable and propagate.
+x = loop(
+  32,
+  r += b;
+  loop(32, r+=1);
+);
+
+// loops last in a function are returned (lambda wrapped)
+function f()(
+  loop(32, r+=1);
+);
+
+// and they propagate through conditionals
+function g()(
+  x < 3 ? (5;) : loop(32, r+=1);
+);
+
+//nesting assigns different indexingvariables
+loop(32,
+    loop(32,
+        r += b;
+        b = var * 1.5;
+    );
+);
+
+while(
+  while(
+      a += b;
+      b *= 1.5;
+      a < 1000;
+  );
+  a < 1000;
+);

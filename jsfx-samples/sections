@@ -1,0 +1,7 @@
+@init
+x = a;
+@block
+m = n;
+@sample
+x = z;
+j = 4;

@@ -1,0 +1,9 @@
+@init
+function f(x) instance (value) (
+    value = x;
+);
+
+function g(y) (
+    x.f(0);
+    x.value = 1;
+);

@@ -1,0 +1,17 @@
+@init
+function v() instance(x, y)
+(
+  x = 4;
+  y = 6;
+);
+
+function v1()
+(
+  v();
+);
+
+r1 = v.x; // 0
+r2 = v.y; // 0
+v1();
+r3 = v.x; // 4
+r4 = v.y; // 6

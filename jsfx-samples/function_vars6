@@ -1,0 +1,19 @@
+@init
+function f1() local(x)(
+  x.y = 4;
+  x.z = 3;
+);
+
+function f2() local(x) (
+  this.x.a = 4;
+  x.b = 3;
+);
+
+function f3() local(x) (
+  this.x = 4;
+  x.c = 3;
+);
+
+f1(); // x.y = 4, x.z = 3 (globals both)
+f2(); // f2.x.a = 4, x.b = 3 (global)
+f3(); // f3.x = 4; x.c = 3 (global)

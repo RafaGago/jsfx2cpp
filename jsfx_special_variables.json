@@ -1,0 +1,30 @@
+{
+    "plain": {
+        "DISABLED_spl0": { "sections": ["sample"], "access": "rw"},
+        "DISABLED_spl1": { "sections": ["sample"], "access": "rw"},
+        "srate":         { "sections": [], "access": "r"},
+        "num_ch":        { "sections": [], "access": "r"},
+        "samplesblock" : { "sections": [], "access": "r"},
+        "tempo":         { "sections": ["block", "sample"], "access": "r"},
+        "play_state":    { "sections": ["block", "sample"], "access": "r"},
+        "play_position": { "sections": ["block", "sample"], "access": "r"},
+        "beat_position": { "sections": ["block", "sample"], "access": "r"},
+        "ts_num":        { "sections": ["block", "sample"], "access": "r"},
+        "ts_denom":      { "sections": ["block", "sample"], "access": "r"},
+        "ext_noinit":    { "sections": ["init"], "access": "w"},
+        "ext_nodenorm":  { "sections": ["init"], "access": "w"},
+        "reg00":         { "sections": [], "access": "rw"},
+        "reg01" :        { "sections": [], "access": "rw"},
+        "pdc_delay":     { "sections": ["block", "slider"], "access": "rw"},
+        "pdc_bot_ch":    { "sections": ["block", "slider"], "access": "rw"},
+        "pdc_top_ch":    { "sections": ["block", "slider"], "access": "rw"},
+        "pdc_midi":      { "sections": ["block", "slider"], "access": "rw"},
+        "ext_midi_bus":  { "sections": [], "access": "w"},
+        "midi_bus":      { "sections": [], "access": "w"}
+    },
+    "regex": {
+        "DISABLED_spl[0-6][0-9]": { "sections": ["sample"], "access": "rw"},
+        "reg[0-9][0-9]": { "sections": [], "access": "rw"},
+        "_global\\.*":   { "sections": [], "access": "rw"}
+    }
+}
