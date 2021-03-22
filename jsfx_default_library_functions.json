@@ -6,6 +6,8 @@
     "sqrt":  {"to": "std::sqrt", "headers": ["cmath"]},
     "sin" :  {"to": "std::sin",  "headers": ["cmath"]},
     "cos" :  {"to": "std::cos",  "headers": ["cmath"]},
+    "tan" :  {"to": "std::tan",  "headers": ["cmath"]},
+    "tanh":  {"to": "std::tanh", "headers": ["cmath"]},
     "ceil":  {"to": "std::ceil", "headers": ["cmath"]},
     "floor": {"to": "std::ceil", "headers": ["cmath"]},
     "log" :  {"to": "std::log",  "headers": ["cmath"]},
@@ -19,6 +21,16 @@
             "}",
             "static double jsfx_rand (double maxv) {",
             "  return (double) (std::rand() % (uint64_t) maxv);",
+            "}"
+        ]
+    },
+    "sign": {
+        "to": "jsfx_sign",
+        "headers": ["cstdint"],
+        "definition" : [
+            "double jsfx_sign (double value) {",
+            "  auto v = *((uint64_t*)((void*) &value));",
+            "  return (v == 0) ? 0. : (v & (1ull << 63)) ? -1. : 1.;",
             "}"
         ]
     },

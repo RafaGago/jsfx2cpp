@@ -1,0 +1,13 @@
+@init
+function initBuffer(scopebuffer_in, scopebuffermax_in)
+  local()
+  global()
+  instance(scopeptr, scopebuffermax, scopebuffer)
+  (
+    scopebuffer     = scopebuffer_in;
+    scopebuffermax  = scopebuffermax_in;
+
+    scopeptr < scopebuffer ? (
+      scopeptr = scopebuffer
+    ) : ( scopeptr > scopebuffermax ) ? scopeptr = scopebuffer
+  );
