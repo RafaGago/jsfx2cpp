@@ -1517,8 +1517,20 @@ def _classify_variable_scope (head_node, sections):
         if info.parent.type == '=' and info.on_lhs and var not in secvars.refs:
             # Notice that this step is unnaffected by the order of compound
             # statement optimization, as x += 1 reads "x" before setting it, so
-            # no classification error happens
-            secvars.local.add (var)
+            # no classification error happens.
+            #
+            # Still the variable can appear on both sides of the assignment,
+            # e.g. "x = y + x"
+            def has_var (qinfo):
+                if qinfo.node.type != 'identifier':
+                    return False
+                return _make_key (qinfo.node.lhs) == var
+
+            has_var_on_rhs = _query (info.parent.rhs[0], has_var)
+            if len (has_var_on_rhs) == 0:
+                secvars.local.add (var)
+            else:
+                secvars.glbal.add (var)
         else:
             secvars.glbal.add (var)
         secvars.unclassified.discard (var)
@@ -1844,7 +1856,11 @@ def _generate_class_file(
 
         add_separator (ret)
         ret += [f'// global/stateful variables for section "{section}"\n']
-        ret += [f'double {v} = {{}};' for v in sorted (newvars)]
+        ret += [f'double {v};' for v in sorted (newvars)]
+        add_separator (ret)
+        ret += [f'void init_{section}_variables()\n{{']
+        ret += [f'{v} = 0;' for v in sorted (newvars)]
+        ret += [f'}}']
 
     add_separator (ret)
     ret += ['jsfx_process() {jsfx_process_reset();}\n']
@@ -1889,18 +1905,18 @@ class Slider:
         # slider1:0<-100,6,1>Wet Mix (dB)
         # slider1:wet_db=-12<-60,12>-Wet (dB)
         # slider8:0,Output frequency (Hz)
-        remainder = code.split (':')
+        remainder = code.strip().split (':')
         if len (remainder) == 2:
-            self.id = remainder[0]
+            self.id = remainder[0].strip()
         else:
             do_raise()
 
-        remainder = remainder[1].split ('=')
+        remainder = remainder[1].strip().split ('=')
         if len (remainder) == 1:
             self.var = self.id
         elif len (remainder) == 2:
-            self.var = remainder[0]
-            remainder = [remainder[1]]
+            self.var = remainder[0].strip()
+            remainder = [remainder[1].strip()]
         else:
             do_raise()
 
@@ -1910,34 +1926,34 @@ class Slider:
 
         if '<' not in code:
             # slider8:0,Output frequency (Hz)
-            remainder = remainder[0].split (',')
+            remainder = remainder[0].strip().split (',')
             self.default = float (remainder[0])
-            self.description = remainder[1]
+            self.description = remainder[1].strip()
             self.hidden = self.description.startswith ('-')
             return
 
-        remainder = remainder[0].split ('<')
+        remainder = remainder[0].strip().split ('<')
         if len (remainder) == 2:
-            self.default = float(remainder[0])
+            self.default = float(remainder[0].strip())
         else:
             do_raise()
 
-        remainder = remainder[1].split ('>')
+        remainder = remainder[1].strip().split ('>')
         if len (remainder) == 2:
-            self.description = remainder[1]
+            self.description = remainder[1].strip()
             self.hidden = self.description.startswith ('-')
         else:
             do_raise()
 
-        remainder = remainder[0].split ('{')
-        remainder = remainder[0] # ignoring label specifications
+        remainder = remainder[0].strip().split ('{')
+        remainder = remainder[0].strip() # ignoring label specifications
         remainder = remainder.split (',')
 
-        if len (remainder) >= 1:
+        if len (remainder) >= 1 and remainder[0] != '':
             self.min = float (remainder[0])
-        if len (remainder) >= 2:
+        if len (remainder) >= 2 and remainder[1] != '':
             self.max = float (remainder[1])
-        if len (remainder) >= 3:
+        if len (remainder) >= 3 and remainder[2] != '':
             self.step = float (remainder[2])
         if len (remainder) >= 4:
             do_raise()
@@ -2067,10 +2083,12 @@ def _merge_block_and_sample_sections (ast):
     loop = Node ('loop-counter', [block_length], [seq_node])
 
     if block_start is None:
-        # no 'block' section
+        # no 'block' section, change the sample section to be the block
+        assert (seq[sample_start].type == 'section')
+        seq[sample_start].lhs = 'block'
         rm_start = sample_start + 1
-        assert (seq[block_start].type == 'section')
-        seq[block_start].lhs = 'block'
+        block_start = sample_start
+        block_end = rm_start
     else:
         rm_start = sample_start
 

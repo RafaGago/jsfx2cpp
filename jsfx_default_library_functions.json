@@ -3,7 +3,7 @@
     "min" :  {"to": "std::min",  "headers": ["algorithm"]},
     "pow" :  {"to": "std::pow",  "headers": ["cmath"]},
     "exp" :  {"to": "std::exp",  "headers": ["cmath"]},
-    "sqrt":  {"to": "std::sqrt", "headers": ["cmath"]},
+    "sqr" :  {"to": "std::sqrt", "headers": ["cmath"]},
     "sin" :  {"to": "std::sin",  "headers": ["cmath"]},
     "cos" :  {"to": "std::cos",  "headers": ["cmath"]},
     "tan" :  {"to": "std::tan",  "headers": ["cmath"]},

@@ -153,7 +153,7 @@ def p_identifier(p):
     '''identifier : IDENTIFIER'''
     v = p[1].replace('..', '.!parent.')
     v = v.split(".") # namespace splitting
-    name = [ x.replace('!parent', '..') for x in v]
+    name = [ x.replace('!parent', '..').lower() for x in v]
     p[0] = Node ("identifier", name, [], bottom = True, line=p.lineno (1))
 
 def p_assignable_value_1(p):
