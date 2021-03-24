@@ -1527,10 +1527,11 @@ def _classify_variable_scope (head_node, sections):
                 return _make_key (qinfo.node.lhs) == var
 
             has_var_on_rhs = _query (info.parent.rhs[0], has_var)
-            if len (has_var_on_rhs) == 0:
-                secvars.local.add (var)
-            else:
+            if len (has_var_on_rhs) != 0 or info.parent.rhs[0].is_arithmetic:
+                # appears on the left hand side of an assignment: has memory
                 secvars.glbal.add (var)
+            else:
+                secvars.local.add (var)
         else:
             secvars.glbal.add (var)
         secvars.unclassified.discard (var)
