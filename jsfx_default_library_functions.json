@@ -4,9 +4,13 @@
     "pow" :  {"to": "std::pow",  "headers": ["cmath"]},
     "exp" :  {"to": "std::exp",  "headers": ["cmath"]},
     "sqr" :  {"to": "std::sqrt", "headers": ["cmath"]},
+    "cbrt":  {"to": "std::cbrt", "headers": ["cmath"]},
     "sin" :  {"to": "std::sin",  "headers": ["cmath"]},
+    "sinh":  {"to": "std::sinh", "headers": ["cmath"]},
     "cos" :  {"to": "std::cos",  "headers": ["cmath"]},
+    "cosh":  {"to": "std::cosh", "headers": ["cmath"]},
     "tan" :  {"to": "std::tan",  "headers": ["cmath"]},
+    "atan":  {"to": "std::atan", "headers": ["cmath"]},
     "tanh":  {"to": "std::tanh", "headers": ["cmath"]},
     "ceil":  {"to": "std::ceil", "headers": ["cmath"]},
     "floor": {"to": "std::ceil", "headers": ["cmath"]},
@@ -21,6 +25,24 @@
             "}",
             "static double jsfx_rand (double maxv) {",
             "  return (double) (std::rand() % (uint64_t) maxv);",
+            "}"
+        ]
+    },
+    "asin": {
+        "to": "jsfx_asin",
+        "headers": ["cmath"],
+        "definition" : [
+            "static double jsfx_rand (double v) {",
+            "  return (v <= 1. && v >= -1.) ? std::asin (v) : 0.;",
+            "}"
+        ]
+    },
+    "acos": {
+        "to": "jsfx_asin",
+        "headers": ["cmath"],
+        "definition" : [
+            "static double jsfx_rand (double v) {",
+            "  return (v <= 1. && v >= -1.) ? std::acos (v) : 0.;",
             "}"
         ]
     },
