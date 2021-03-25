@@ -45,7 +45,7 @@ def jsfx_preprocess(
                 fpath = os.path.join (path, filename)
                 try:
                     with open (fpath, 'r') as file:
-                        content = file.read()
+                        content = file.readlines()
                     sub_sections = jsfx_preprocess(
                         content,
                         selected_sections,
