@@ -4,9 +4,20 @@ from lexer import tokens, CompileError
 
 #Parser as in eel2, almost vanilla, with no modifications
 
+#-------------------------------------------------------------------------------
+class NodeIds:
+    def __init__(self):
+        self.uid = 0
+
+    def get_new (self):
+        self.uid += 1
+        return self.uid
+
+nodeids = NodeIds()
+
 class Node:
     def __init__(self, *args, **kwargs):
-        self.reset(*args, **kwargs)
+        self.reset(*args, **kwargs, get_new_id=True)
 
     def reset(
         self,
@@ -20,7 +31,8 @@ class Node:
         integer=False,
         parentheses=False,
         bottom=False,
-        assignable=True
+        assignable=True,
+        get_new_id=True
         ):
         # TODO: just storing lineno of the fist token, could store the range
         self.line = line
@@ -36,6 +48,8 @@ class Node:
         self.has_parentheses = parentheses
         self.is_bottom = bottom #bottom elements have no array on lhs and rhs
         self.is_assignable = assignable
+        if get_new_id:
+            self.id = nodeids.get_new()
 
     def __str__ (self):
         return '\n'.join (self.debug_iterate([]))

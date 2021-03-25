@@ -346,7 +346,7 @@ class Sections:
             '_$numrefs' : {}, # use of variables on other sections
             #'_$str' : set(), # strings
             '_$func'    : {}, # FunctionTraits objects indexed by function name
-            '_$calls'   : {}, # FunctionCall objects indexed by node
+            '_$calls'   : {}, # FunctionCall objects indexed by node id
         }
         self.order.append (section_name)
         # Add the new section to previously existing sections's variable refs
@@ -371,7 +371,7 @@ class Sections:
             del cp[section]['_$calls']
             cp[section]['_$calls'] = {}
             for node, v in self.sd[section]['_$calls'].items():
-                cp[section]['_$calls'][f'<node {id(node)}>'] = v
+                cp[section]['_$calls'][node.id] = v
         return cp
 
     def classify_variable_reference (self, section, var):
@@ -402,7 +402,7 @@ class Sections:
 
     def add_call (self, section, node, call):
         assert (type (call) == FunctionCall)
-        self.sd[section]['_$calls'][node] = call
+        self.sd[section]['_$calls'][node.id] = call
         traits, _ = self.find_function_traits (section, call.function)
         required_variables = call.append_required_instance_variables (traits)
         for var in required_variables:
@@ -410,7 +410,7 @@ class Sections:
 
     def find_call (self, section, node):
         for ssection in self.get_function_search_sections (section):
-            call = self.sd[ssection]['_$calls'].get (node)
+            call = self.sd[ssection]['_$calls'].get (node.id)
             if call:
                 return call, ssection
         return None, None
@@ -486,7 +486,7 @@ class FunctionTraits:
         self.instance = [] # what is detected, keeping order
         self.parent_instance = []  # what is detected, keeping order (not impl)
         self.inherited = [] # inherited variables
-        self.calls = {} # indexed by node
+        self.calls = {} # contains FunctionCall indexed by node.id
 
     def key_matches_on_instance_namespaces (self, key):
             if key in self.instance_unchecked:
@@ -534,11 +534,14 @@ class FunctionTraits:
             self.parent_instance.add (key)
         return name
 
-    def add_call (self, called, traits):
+    def add_call (self, node, called, traits):
           # NOTICE: parent declarations by this.. are not implemented. My
           # intention is to avoid them.
+        assert (type (node) == Node)
         assert (type (called) == FunctionCall)
         assert (type (traits) == FunctionTraits)
+
+        self.calls[node.id] = called
 
         instance_vars = called.append_required_instance_variables (traits)
         if len (instance_vars) == 0:
@@ -712,11 +715,10 @@ def _register_functions_and_variables (sections, head_node):
                 info.state.section, state.function_key
                 )
             assert (type (thisfunc) == FunctionTraits)
-            thisfunc.calls[info.node] = called
             traits, _ = state.sections.find_function_traits(
                 called.section, called.function
                 )
-            thisfunc.add_call (called, traits)
+            thisfunc.add_call (info.node, called, traits)
 
     state = DetectVariablesState (sections)
     # This function makes multiple "_tree_visit" calls, so we manually pass
@@ -1310,7 +1312,7 @@ def _generate_cpp (ast, codegen_context):
                 call, _ = state.sections.find_call (state.section, info.node)
             else:
                 # call made from inside a function
-                call = state.function_traits.calls.get (info.node)
+                call = state.function_traits.calls.get (info.node.id)
 
             if call is None:
                 # call to some function not defined on this JSFX e.g. "memset"
