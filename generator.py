@@ -81,7 +81,7 @@ class VisitorInfo:
 
     def __str__(self):
         s = self
-        return f"type: '{s.node.type}', ptype: '{s.parent.type}', lhs: {s.on_lhs}, idx: {s.idx}, slast: {s.last_idx}, depth: {s.seq_depth}"
+        return f"type: '{s.node.type}', ptype: '{s.parent.type}', lhs: {s.on_lhs}, idx: {s.idx}, slast: {s.last_idx}, depth: {self.__len__()}"
 
     def copy(self):
         return deepcopy(self)
@@ -211,8 +211,8 @@ def _flatten_multiple_assignments_in_expression (head_node):
     # Flattens assignments.
     #
     # The idea is to flatten assignments like those below:
-    # echo "x = (y = x) + z" | ./eel2c.py --mode ast
-    # echo "x = (y = x)" | ./eel2c.py --mode ast
+    # echo "x = (y = x) + z" | ./eel2c.py --mode parser
+    # echo "x = (y = x)" | ./eel2c.py --mode parser
     #
     # This is just for making the next transformations and the generated code
     # easier to reason about. I personally dislike multiple assignments on the
@@ -226,15 +226,12 @@ def _flatten_multiple_assignments_in_expression (head_node):
 
     assert(head_node.type == 'seq')
 
-    def flatten_assignments_on_seq_if(side, idx):
-        node = side[idx]
+    def make_node_a_seq_if_has_assignments(node):
         if node.type != 'seq':
             equals = _query (node, lambda info: info.node.type == '=')
             if len (equals) > 0:
                 # some assignments, we do a conversion to a sequence
                 node = Node ("seq", [node], line=node.line)
-
-        side[idx] = node
 
     def visiting_new(info, _):
         assert (type (info) == VisitorInfo)
@@ -242,15 +239,15 @@ def _flatten_multiple_assignments_in_expression (head_node):
         # sequences when traveling down the tree. This is for an easier
         # implementation on the main loop. It has no harmful side effects.
         if info.node.type == 'if':
-            flatten_assignments_on_seq_if (info.node.rhs, 0)
+            make_node_a_seq_if_has_assignments (info.node.rhs[0])
             if len (info.node.rhs) == 2:
-                flatten_assignments_on_seq_if (info.node.rhs, 1)
+                make_node_a_seq_if_has_assignments (info.node.rhs[1])
 
         elif info.node.type == 'function':
-            flatten_assignments_on_seq_if (info.node.rhs, 0)
+            make_node_a_seq_if_has_assignments (info.node.rhs[0])
 
         elif info.node.type.startswith ('loop'):
-            flatten_assignments_on_seq_if (info.node.rhs, 0)
+            make_node_a_seq_if_has_assignments (info.node.rhs[0])
 
         if info.node.type == 'seq':
             # sequences stop the visit down its branch, they have to be
@@ -283,14 +280,13 @@ def _flatten_multiple_assignments_in_expression (head_node):
             assert(info.node.type == '=')
 
             # assignment on previous statement
-            copy = info.node.copy (head_node) # updates parents
-            flat.append(copy)
+            copy = info.node.copy() # updates parents
+            flat.append (copy)
 
             # update assignment with lhs of the assignment.
             dst = info.parent.lhs if info.on_lhs else info.parent.rhs
             pidx = info.idx
             dst[pidx] = info.node.lhs[0]
-            dst[pidx].parent = info.parent # manual update
 
         flat.append(node)
 
@@ -1214,7 +1210,7 @@ def _generate_cpp (ast, codegen_context):
         if info.node.is_bottom:
             # TODO handle string
             if info.node.type == 'identifier':
-                v = _get_identifier_key (info.node)
+                v = _get_identifier_key (info.node).lower()
             elif info.node.type == 'string_literal':
                 v = f'0.; /* jsfx2cpp strings unsupported: was: {info.node.lhs} */'
             else:

@@ -1,4 +1,5 @@
 @init
-data = 0;
-data = (x = 0);
-data *= 1;
+//data = 0;
+//data = (x = 0);
+//data *= 1;
+rata = a = b = c = d = e = f = 1;

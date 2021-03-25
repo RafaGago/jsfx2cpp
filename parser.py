@@ -67,9 +67,6 @@ class Node:
         return out
 
     def set_children (self, children, on_lhs):
-        for n in children:
-            if type(n) is Node:
-                n.parent = self
         if on_lhs:
             self.lhs = children
         else:
@@ -81,23 +78,9 @@ class Node:
     def set_rhs (self, rhs):
         self.set_children (rhs, on_lhs=False)
 
-    def copy (self, new_parent=None):
+    def copy (self):
         cp = deepcopy (self)
-        cp.update_parents (new_parent)
         return cp
-
-    def update_children_parents (self, on_lhs):
-        # Full rebuild of the parent backreferences, necessary after
-        # invalidating iterators (e.g. deepcopy)
-        dst = self.lhs if on_lhs else self.rhs
-        for n in dst:
-            if type(n) is Node:
-                n.update_parents (self)
-
-    def update_parents (self, parent=None):
-        self.parent = parent
-        self.update_children_parents (on_lhs=True)
-        self.update_children_parents (on_lhs=False)
 
 # this was done with:
 # https://github.com/dabeaz/ply/tree/master/example/yply
