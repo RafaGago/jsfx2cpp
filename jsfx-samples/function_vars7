@@ -9,5 +9,8 @@ function f1() local(x)(
   x.addx();
 );
 
-f1(); // x.x = 6, x.y = 4, x.z = 3;
-a.f1(); // x.x = 6, x.y = 4, x.z = 3; (nothing new)
+// x.x = 6, x.y = 4, x.z = 3;
+f1();
+
+// x.x = 6, x.y = 4, x.z = 3; (nothing new)
+a.f1();

@@ -1,0 +1,26 @@
+@init
+function f1 (x) instance (h0, h1) (
+  h1 = h0;
+  h0 = x;
+);
+
+function f1w( x) (
+    this.f1(x);
+);
+
+w.f1w (1);
+
+/*
+function f2 (x) instance (h0, h1) (
+  h1 = h0;
+  h0 = x;
+);
+
+function f2w (x) (
+    x < 0
+        ? this.f1 (x)
+        : this.f2 (x);
+);
+
+w.f2w (2);
+*/

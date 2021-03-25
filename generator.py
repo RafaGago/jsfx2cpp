@@ -322,6 +322,7 @@ class FunctionCall:
         call_params = [_make_key([namespace, x]) for x in traits.instance]
         call_params_i = [_make_key([namespace, x]) for x in traits.inherited]
         for var in call_params + call_params_i:
+            var = var.replace ('this$', '')
             variables.append (var)
             self.instance_variable_refs.append (var)
         return variables
@@ -544,7 +545,8 @@ class FunctionTraits:
             return # Function uses no namespacing
 
         # Extra variables required.
-        if self.key_matches_on_instance_namespaces (called.call_namespace):
+        if self.key_matches_on_instance_namespaces (called.call_namespace) or \
+            called.call_namespace == 'this':
             # Inherited variables will be forwarded down to the caller of this
             # function (the one pointed to self). Parameters will added to this
             # function signature as passed-by-reference.
@@ -574,7 +576,7 @@ class FunctionTraits:
             #
             # This is exactly the reason why making structs of all the
             # instance parameters is a bad idea.
-            variable_type_list.append (variable)
+            variable_type_list.append (variable.replace ('this$', ''))
 
     def __repr__(self):
         s = self
@@ -601,42 +603,6 @@ class DetectVariablesState:
         self.sections = sections
         self.function_key = None
 
-#-------------------------------------------------------------------------------
-def _move_functions_to_top_of_blocks (head_node, merge_block_and_samples):
-    functions = {
-        'block': [],
-        'sample': [],
-    }
-    current_section = None
-
-    for node in head_node.lhs:
-        # asumming working JSFX, so functions declarations don't appear on weird
-        # scopes.
-        if node.type == 'section':
-            current_section = node.lhs
-            functions[current_section] = []
-
-        if node.type == 'function':
-            functions[current_section].append(node)
-
-    for _, funclist in functions.items():
-        for f in funclist:
-            head_node.lhs.remove(f)
-
-    if merge_block_and_samples:
-        functions['block'] += functions['sample']
-        functions['sample'] = []
-
-    i = 0
-    while i < len (head_node.lhs):
-        node = head_node.lhs[i]
-        if node.type == 'section':
-            j = 1
-            for func in functions[node.lhs]:
-                head_node.lhs.insert(i + j, func)
-                j += 1
-            i += j - 1
-        i += 1
 #-------------------------------------------------------------------------------
 def _register_functions_and_variables (sections, head_node):
     # Creates the Sections data structure, that will contain all the required
@@ -723,9 +689,10 @@ def _register_functions_and_variables (sections, head_node):
 
         if info.node.type == 'identifier':
             if info.parent.type == 'call' and info.on_lhs:
-                # identifiers on function calls are processed on the "call"
-                # section, as they need resolution .e.g what is this.x.y.z(a) a
-                # call to "z" from "this.x.y"? a call to "y.z" from "this.x"?
+                # identifiers on function calls have already been processed on
+                # the "call" section, as they need resolution .e.g what is
+                # this.x.y.z(a) a call to "z" from "this.x.y"? a call to "y.z"
+                # from "this.x"?
                 return
             thisfunc, _ = state.sections.find_function_traits(
                 info.state.section, state.function_key
@@ -744,7 +711,7 @@ def _register_functions_and_variables (sections, head_node):
             thisfunc, _ = state.sections.find_function_traits(
                 info.state.section, state.function_key
                 )
-            assert (type(thisfunc) == FunctionTraits)
+            assert (type (thisfunc) == FunctionTraits)
             thisfunc.calls[info.node] = called
             traits, _ = state.sections.find_function_traits(
                 called.section, called.function
@@ -771,7 +738,42 @@ def _register_functions_and_variables (sections, head_node):
             info = VisitorInfo (node, head_node, state=visit_state)
             visit_state = \
                 _tree_visit (info, visiting_new, global_visitor, state)
+#-------------------------------------------------------------------------------
+def _move_functions_to_top_of_blocks (head_node, merge_block_and_samples):
+    functions = {
+        'block': [],
+        'sample': [],
+    }
+    current_section = None
 
+    for node in head_node.lhs:
+        # asumming working JSFX, so functions declarations don't appear on weird
+        # scopes.
+        if node.type == 'section':
+            current_section = node.lhs
+            functions[current_section] = []
+
+        if node.type == 'function':
+            functions[current_section].append(node)
+
+    for _, funclist in functions.items():
+        for f in funclist:
+            head_node.lhs.remove(f)
+
+    if merge_block_and_samples:
+        functions['block'] += functions['sample']
+        functions['sample'] = []
+
+    i = 0
+    while i < len (head_node.lhs):
+        node = head_node.lhs[i]
+        if node.type == 'section':
+            j = 1
+            for func in functions[node.lhs]:
+                head_node.lhs.insert(i + j, func)
+                j += 1
+            i += j - 1
+        i += 1
 #-------------------------------------------------------------------------------
 def _emulate_implicit_return_values (head_node):
     # The current implementation of implicit return values is based on making
