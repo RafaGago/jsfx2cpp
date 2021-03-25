@@ -388,6 +388,9 @@ class Sections:
         for section, v in self.sd.items():
             if section != to_source_section:
                 res |= v['_$numrefs'][to_source_section]
+            else:
+                for _, ft in v["_$func"].items():
+                    res |= set (ft.globals)
         return res
 
     def get_variables (self, section):
@@ -2119,10 +2122,8 @@ def generate(
     _emulate_implicit_return_values (ast)
     _handle_if_assignments_on_lhs (ast)
     _use_compound_assignments (ast)
-
     # TODO: detect constants?
     # TODO: chainded if else statements that can be substituted by a switch?
-
     #Generation steps, no more AST manipulation
     classified_variables = _classify_variable_scope (ast, sections)
     all_funcs = {**lib_funcs, **slider_funcs, **specvar_funcs}

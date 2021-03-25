@@ -1,0 +1,12 @@
+@block
+x = 4;
+
+@sample
+function processSample()
+(
+  y = x + 1;
+
+);
+
+processSample()
+z = y;
