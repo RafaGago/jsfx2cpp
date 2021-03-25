@@ -1912,9 +1912,9 @@ class Slider:
 
         remainder = remainder[1].strip().split ('=')
         if len (remainder) == 1:
-            self.var = self.id
+            self.var = self.id.lower()
         elif len (remainder) == 2:
-            self.var = remainder[0].strip()
+            self.var = remainder[0].strip().lower()
             remainder = [remainder[1].strip()]
         else:
             do_raise()
