@@ -1981,7 +1981,7 @@ return 0.;
 }}
 // Snippet for parameter boilerplate in the authors C++ framework....
 /*
-float {sld.var}p = {sld.min};
+float {sld.var}p = {sld.default};
 
 struct {sld.var}_tag {{}};
 
@@ -1993,8 +1993,8 @@ void set ({sld.var}_tag, float v) {{
   slider();
 }}
 
-static constexpr auto get_{sld.var}_parameter() {{
-  return float_pram ("", {sld.min}, {sld.max}, {sld.default}, {sld.step});
+static constexpr auto get_parameter({sld.var}_tag) {{
+  return float_param ("", {sld.min}, {sld.max}, {sld.default}, {sld.step});
 }}
 */'''
         )
