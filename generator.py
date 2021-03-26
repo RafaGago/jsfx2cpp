@@ -1908,6 +1908,7 @@ class Slider:
         # slider1:0<-100,6,1>Wet Mix (dB)
         # slider1:wet_db=-12<-60,12>-Wet (dB)
         # slider8:0,Output frequency (Hz)
+        self.line = code
         remainder = code.strip().split (':')
         if len (remainder) == 2:
             self.id = remainder[0].strip()
@@ -1975,9 +1976,27 @@ def _parse_slider_code_section (slider_section_code):
 double {fname}() {{
 // TODO: stub, add code for getting "{name}"
 // Range: min:{sld.min}, max:{sld.max}, default: {sld.default}, step: {sld.step}
+// Original line: {sld.line}
 return 0.;
 }}
-        '''
+// Snippet for parameter boilerplate in the authors C++ framework....
+/*
+float {sld.var}p = {sld.min};
+
+struct {sld.var}_tag {{}};
+
+void set ({sld.var}_tag, float v) {{
+  if (v == {sld.var}p) {{
+    return;
+  }}
+  {sld.var}p = v;
+  slider();
+}}
+
+static constexpr auto get_{sld.var}_parameter() {{
+  return float_pram ("", {sld.min}, {sld.max}, {sld.default}, {sld.step});
+}}
+*/'''
         )
         slider_funcs[fname] = libfunc
 
