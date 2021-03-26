@@ -16,6 +16,7 @@
     "ceil":  {"to": "std::ceil",  "headers": ["cmath"]},
     "floor": {"to": "std::ceil",  "headers": ["cmath"]},
     "log" :  {"to": "std::log",   "headers": ["cmath"]},
+    "log10": {"to": "std::log10", "headers": ["cmath"]},
     "abs" :  {"to": "std::fabs",  "headers": ["cmath"]},
     "rand": {
         "to": "jsfx_rand",
