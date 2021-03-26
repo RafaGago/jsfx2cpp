@@ -1973,14 +1973,20 @@ def _parse_slider_code_section (slider_section_code):
         sld = sliders[name]
         fname = f'get_slider_{name}'
         libfunc = LibraryFunction (fname, [], [], f'''
+#if 1
 double {fname}() {{
 // TODO: stub, add code for getting "{name}"
 // Range: min:{sld.min}, max:{sld.max}, default: {sld.default}, step: {sld.step}
 // Original line: {sld.line}
-return 0.;
+  return 0.;
 }}
-// Snippet for parameter boilerplate in the authors C++ framework....
-/*
+#else
+// Snippet for parameter boilerplate in the authors framework....
+double {fname}() {{
+// Range: min:{sld.min}, max:{sld.max}, default: {sld.default}, step: {sld.step}
+  return {sld.var}p;
+}}
+
 float {sld.var}p = {sld.default};
 
 struct {sld.var}_tag {{}};
@@ -1994,9 +2000,10 @@ void set ({sld.var}_tag, float v) {{
 }}
 
 static constexpr auto get_parameter({sld.var}_tag) {{
+  // Original slider line: {sld.line}
   return float_param ("", {sld.min}, {sld.max}, {sld.default}, {sld.step});
 }}
-*/'''
+#endif'''
         )
         slider_funcs[fname] = libfunc
 
