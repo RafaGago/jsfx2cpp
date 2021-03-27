@@ -29,3 +29,7 @@ and there:
 * Not a lot of documentation etc..
 * Coding on a big file.
 * The error output could be improved
+
+Known issues/omissions:
+
+* "this.." not implemented, just "this.".
