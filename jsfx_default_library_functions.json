@@ -35,16 +35,16 @@
         "to": "jsfx_asin",
         "headers": ["cmath"],
         "definition" : [
-            "static double jsfx_rand (double v) {",
+            "static double jsfx_asin (double v) {",
             "  return (v <= 1. && v >= -1.) ? std::asin (v) : 0.;",
             "}"
         ]
     },
     "acos": {
-        "to": "jsfx_asin",
+        "to": "jsfx_acos",
         "headers": ["cmath"],
         "definition" : [
-            "static double jsfx_rand (double v) {",
+            "static double jsfx_acos (double v) {",
             "  return (v <= 1. && v >= -1.) ? std::acos (v) : 0.;",
             "}"
         ]
