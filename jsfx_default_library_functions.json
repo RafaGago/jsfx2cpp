@@ -4,6 +4,7 @@
     "pow" :  {"to": "std::pow",   "headers": ["cmath"]},
     "exp" :  {"to": "std::exp",   "headers": ["cmath"]},
     "sqr" :  {"to": "std::sqrt",  "headers": ["cmath"]},
+    "sqrt":  {"to": "std::sqrt",  "headers": ["cmath"]},
     "cbrt":  {"to": "std::cbrt",  "headers": ["cmath"]},
     "sin" :  {"to": "std::sin",   "headers": ["cmath"]},
     "sinh":  {"to": "std::sinh",  "headers": ["cmath"]},
