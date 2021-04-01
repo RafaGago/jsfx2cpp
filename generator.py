@@ -7,7 +7,7 @@ import json
 import jsonschema
 
 GLOBAL_Section = 'init'
-STATIC_MEM_ARRAY = 'mempool'
+JSFX_HEAP_CALL = 'heap'
 LOOP_TEMP = '$$loop_ret_'
 #-------------------------------------------------------------------------------
 def warn(txt):
@@ -1088,29 +1088,41 @@ static double eel2_xor (double lhs, double rhs)
     )
 
     # From jsfx ----------------------------------------------------------------
-    lib_funcs['memset'] = LibraryFunction ('jsfx_memset', ['cstring'], [], '''
-void jsfx_memset (double idx, double val, double size)
-{{
-    std::memset (&{mem}[(size_t) idx], (int) val, (size_t) size);
-}}
-'''.format (mem=STATIC_MEM_ARRAY).replace ('\n', '')
-    )
+    lib_funcs[JSFX_HEAP_CALL]= \
+        LibraryFunction (JSFX_HEAP_CALL, ['cstring', 'vector'], [], '''
+std::vector<float> heapmem;
+inline float& heap (std::size_t value)
+{
+    return heapmem[value];
+}
 
-    lib_funcs['memcpy'] = LibraryFunction ('jsfx_memcpy', ['cstring'], [], '''
-void jsfx_memcpy (double idx, double val, double size)
-{{
-    std::memcpy (&{mem}[(size_t) dst], &{mem}[(size_t) src], (size_t) size);
-}}
-'''.format (mem=STATIC_MEM_ARRAY).replace ('\n', '')
-    )
+void heap_reset (std::size_t s)
+{
+    /*heap_reset has to be set after manual analysis of the mem requirements*/
+    __todo__ calculate_heap_size{};
 
-    header = [f'''
-/* "{STATIC_MEM_ARRAY}" emulates the JSFX per instance memory pool.
-It can be removed if unused. On most cases the length of this array can be
-reduced. It is set to a very conservative (high) value matching what JSFX
-provides. */
-double {STATIC_MEM_ARRAY}[8 * 1024 * 1024] = {{}};
-''']
+    heapmem.resize (s);
+    std::memset (heapmem.data(), 0, heapmem.size() * sizeof heapmem[0]);
+}
+'''.replace ('\n', ''))
+
+    lib_funcs['memcpy'] = \
+        LibraryFunction ('jsfx_memcpy', ['cstring'], [JSFX_HEAP_CALL], '''
+void jsfx_memcpy (size dst, size_t src, size_t size)
+{
+    std::memcpy (&heapmem[dst], &heapmem[src], size);
+}
+'''.replace ('\n', ''))
+
+    lib_funcs['memset'] = \
+        LibraryFunction ('jsfx_memset', ['cstring'], [JSFX_HEAP_CALL], '''
+void jsfx_memset (size_t idx, int val, size_t size)
+{
+    std::memset (&heapmem[idx], val, size);
+}
+'''.replace ('\n', ''))
+
+    header = ['']
     return header, lib_funcs
 #-------------------------------------------------------------------------------
 class KnownNode(Enum):
@@ -1356,7 +1368,8 @@ def _generate_cpp (ast, codegen_context):
             return
 
         if info.node.type == '[]':
-            state.add_code (f'{STATIC_MEM_ARRAY}[(size_t)(')
+            state.add_code (f'{JSFX_HEAP_CALL}(')
+            state.used_funcs.add (JSFX_HEAP_CALL)
             lhs = info.node.lhs[0]
             assert(lhs.type != 'identifier' or lhs.lhs[0] != 'gmem') #not impl
             visit_branch (lhs, info.node, state, info)
@@ -1366,15 +1379,15 @@ def _generate_cpp (ast, codegen_context):
                 val = int (float (info.node.rhs[0].lhs[0]))
 
             if val == 0:
-                state.add_code (')]')
+                state.add_code (')')
             elif rhs_type == 'identifier' or rhs_type == 'value':
                 state.add_code (' + ')
                 visit_branch (info.node.rhs[0], info.node, state, info)
-                state.add_code (')]')
+                state.add_code (')')
             else:
                 state.add_code ('+ (')
                 visit_branch (info.node.rhs[0], info.node, state, info)
-                state.add_code ('))]')
+                state.add_code ('))')
             return
 
         if info.node.type == 'call-x2':
