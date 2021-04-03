@@ -30,6 +30,24 @@ and there:
 * Coding on a big file.
 * The error output could be improved
 
-Known issues/omissions:
+Deliberate known issues/omissions:
 
 * "this.." not implemented, just "this.".
+* strings.
+
+Non-deliberate known issues/omissions:
+
+The list below are just surprises that just popped up  due to lack of formal
+specification/documentation on the language. These JSFX features were found very
+late after successfuilly parsing many non-trivial JSFX scripts:
+
+* No function parameter namespaces. E.g. fn(namespace*, namespace*)
+
+* Function overloads not supported. Again not possible because of lack of formal
+  specification/documentation. Only found about its existance pretty late on the
+  cycle-
+
+While fixeable, these features are sparsely used and the generator fails loudly,
+so I'm temporarilly editing the scripts that don't translate manually before
+deciding if doing things right is worth the effort. Both appeared on some
+Geraint Luff's scripts.
