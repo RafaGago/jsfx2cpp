@@ -500,13 +500,17 @@ class FunctionTraits:
         idtype = 'default' # too lazy for an enum for this
 
         if name[0] == 'this':
-            if name[1] == '..':
-                #TODO: fail if '..' appears on other places than after 'this'
-                idtype = 'parent_instance'
-                name = name[2:]
+            if len(name) > 1:
+                if name[1] == '..':
+                    #TODO: fail if '..' appears on other places than after 'this'
+                    idtype = 'parent_instance'
+                    name = name[2:]
+                else:
+                    idtype = 'instance'
+                    name = name[1:]
             else:
                 idtype = 'instance'
-                name = name[1:]
+                name = ['this$']
 
         key = _make_key(name)
 
