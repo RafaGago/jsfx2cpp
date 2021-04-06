@@ -1114,7 +1114,7 @@ void heap_reset (std::size_t s)
         LibraryFunction ('jsfx_memcpy', ['cstring'], [JSFX_HEAP_CALL], '''
 void jsfx_memcpy (size dst, size_t src, size_t size)
 {
-    std::memcpy (&heapmem[dst], &heapmem[src], size);
+    std::memcpy (&heapmem[dst], &heapmem[src], size * sizeof heapmem[0]);
 }
 '''.replace ('\n', ''))
 
@@ -1122,7 +1122,7 @@ void jsfx_memcpy (size dst, size_t src, size_t size)
         LibraryFunction ('jsfx_memset', ['cstring'], [JSFX_HEAP_CALL], '''
 void jsfx_memset (size_t idx, int val, size_t size)
 {
-    std::memset (&heapmem[idx], val, size);
+    std::memset (&heapmem[idx], val, size * sizeof heapmem[0]);
 }
 '''.replace ('\n', ''))
 
