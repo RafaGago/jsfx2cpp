@@ -21,13 +21,11 @@
     "abs" :  {"to": "std::fabs",  "headers": ["cmath"]},
     "rand": {
         "to": "jsfx_rand",
-        "headers": ["cstdlib", "limits", "cstdint"],
+        "headers": ["cstdlib"],
         "definition" : [
-            "static double jsfx_rand() {",
-            "  return (double) std::rand();",
-            "}",
-            "static double jsfx_rand (double maxv) {",
-            "  return (double) (std::rand() % (uint64_t) maxv);",
+            "static double jsfx_rand (double maxv = 1.) {",
+            "  static constexpr double randmax = 1. / (double) RAND_MAX;",
+            "  return ((double) rand()) * randmax / maxv;",
             "}"
         ]
     },
