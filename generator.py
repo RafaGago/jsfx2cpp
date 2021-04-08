@@ -443,7 +443,7 @@ class Sections:
             # This might be caused by the merging of the "block" and "sample"
             # sections. A shadowed function might be present on the JSFX code.
             # pass the --no-sample-into-block-merge flag.
-            raise RuntimeError(f'duplicated function: {key}.')
+            raise RuntimeError (f'duplicated function: {key}.')
 
         return key, fd
 

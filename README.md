@@ -47,7 +47,9 @@ late after successfuilly parsing many non-trivial JSFX scripts:
 
 * Function overloads not supported. Again not possible because of lack of formal
   specification/documentation. Only found about its existance pretty late on the
-  cycle-
+  cycle. Adding them is maybe just a 1-2h job in this case, it's just that they
+  are seldomly used so it's more time effective for me to patch the scripts in
+  1 minute.
 
 While fixeable, these features are sparsely used and the generator fails loudly,
 so I'm temporarilly editing the scripts that don't translate manually before
