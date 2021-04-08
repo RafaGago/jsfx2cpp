@@ -490,16 +490,30 @@ def p_expression_3(p):
 
 # ADDONS: Function + p_error
 
+
+def p_id_list_identifier_1(p):
+    '''id_list_identifier : identifier'''
+    p[0] = p[1]
+
+# This is to support namespaces. Notice that all "id_lists" allow the '*', while
+# it should only be allowed on the "id_list" for parameter passing. This is to
+# avoid repeating the grammar.
+
+def p_id_list_identifier_2(p):
+    '''id_list_identifier : identifier '*' '''
+    p[1].lhs[0] = p[1].lhs[0] + '*'
+    p[0] = p[1]
+
 def p_id_list_1(p):
     '''id_list :'''
     p[0] = Node ("id_list",  [], bottom=True)
 
 def p_id_list_2(p):
-    '''id_list : identifier'''
+    '''id_list : id_list_identifier'''
     p[0] = Node ("id_list",  [p[1].lhs], line=p.lineno (1), bottom=True)
 
 def p_id_list_3(p):
-    '''id_list : id_list ',' identifier'''
+    '''id_list : id_list ',' id_list_identifier'''
     if type(p[1]) is Node and p[1].type == 'id_list':
         p[1].lhs.append(p[3].lhs);
         p[0] = p[1]

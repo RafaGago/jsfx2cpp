@@ -1,0 +1,12 @@
+@init
+
+function f2 (x*) (
+    x.z = 5;
+);
+
+function f (x*) (
+    x.y = 3;
+    f2(x);
+);
+
+f(paco);

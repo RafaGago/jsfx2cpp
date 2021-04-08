@@ -2142,6 +2142,152 @@ def _merge_block_and_sample_sections (ast):
     seq.insert (block_end, loop)
     seq.insert (block_start + 1, block_length_assign)
 
+def _replace_single_parameter_namespaces_by_this(ast):
+    # Try to have a minimal support for namespace function variables. This
+    # function is not considering blocks and probably very flawed from a
+    # theoretical perspective.
+    #
+    # As namespace function variables were only discovered by me after parsing
+    # some scripts. They aren't present on the documentation, so I don't feel
+    # like I want to spend the necessary time to properly refactor/redesign to
+    # add this feature, as it is sparsely used by script writers.
+
+    class ReplaceFunctionNamespaceData:
+        def __init__ (self, var, pos, func):
+            self.varname = var
+            self.varpos = pos
+            self.funcname = func
+
+    def function_scope_visiting_new (info, _):
+        if info.node.type == 'call':
+            return VisitType.NODE_ONLY
+
+        return VisitType.NODE_AFTER_LHS
+
+    def function_scope_visitor_body (info, rfnd):
+        # replaces variable occurences and calls inside the function
+        assert (type (info) == VisitorInfo)
+        assert (type (rfnd) == ReplaceFunctionNamespaceData)
+
+        if info.node.type == 'identifier':
+            identifier = info.node.lhs[0]
+            if identifier != rfnd.varname:
+                return
+
+            info.node.lhs[0] = identifier.replace (rfnd.varname, 'this')
+            return
+
+        if info.node.type == 'call':
+            funcname_array = info.node.lhs[0].lhs
+            parameter_expression_array = info.node.rhs
+
+            match_node = None
+            for node in parameter_expression_array:
+                if node.type != 'identifier':
+                    continue
+                if node.lhs[0] == rfnd.varname:
+                    match_node = node
+                    break
+
+            if not match_node:
+                return
+            if funcname_array[0] == 'this':
+                raise RuntimeError(
+                    f'error when replacing namespace variable {rfnd.varname} on {funcname_array.join(".")}: "this" already present')
+
+            info.node.lhs[0].lhs = ['this'] + funcname_array
+            parameter_expression_array.remove (match_node)
+            return
+
+    def non_function_scope_visiting_new (info, _):
+        if info.node.type == 'call' or info.node.type == 'function':
+            return VisitType.NODE_ONLY
+        return VisitType.NODE_AFTER_LHS
+
+    def non_function_scope_visitor_body (info, rfnd_map):
+        # replaces variable occurences and calls inside the function
+        assert (type (info) == VisitorInfo)
+        if info.node.type != 'call':
+            return
+
+        funcname_array = info.node.lhs[0].lhs
+        parameter_expression_array = info.node.rhs
+        call = funcname_array[-1]
+
+        if call not in rfnd_map:
+            return
+
+        if len (funcname_array) > 1:
+            raise RuntimeError(
+                f'"{call}" is already called from a namespace while trying to replace namespace variable: {funcname_array}')
+
+        rfnd = rfnd_map[call]
+        assert (type (rfnd) == ReplaceFunctionNamespaceData)
+
+        assert (len(parameter_expression_array) >= rfnd.varpos)
+        if parameter_expression_array[rfnd.varpos].type != 'identifier':
+            raise RuntimeError(
+                f'on call: "{call}". parameter {rfnd.varpos} was expected to be an identifier when replacing namespace variable')
+
+        nspace = parameter_expression_array[rfnd.varpos].lhs
+        parameter_expression_array.pop (rfnd.varpos)
+        info.node.lhs[0].lhs = nspace + funcname_array
+
+    # First visiting and patching the functions themselves for namespace
+    # parameters. Then doing a global call replace.
+
+    namespace_modified_funcs = {}
+
+    for node in ast.lhs:
+        # functions are always on the top level. No need to complicate the visitor.
+        if node.type != 'function':
+            continue
+
+        namespace_params = 0
+        namespace_param_pos = 0
+
+        id_list = node.lhs[1]
+        if len (id_list.lhs) == 0:
+            continue
+
+        for idx, identifier in enumerate (id_list.lhs):
+            if len(identifier) > 1:
+                #x.y.z: ignoring
+                continue
+            assert (len (identifier) > 0)
+            if identifier[0].endswith('*'):
+                namespace_params += 1
+                namespace_param_pos = idx
+
+        if namespace_params == 0:
+            continue
+
+        if namespace_params > 1:
+            raise RuntimeError(
+                f'only one namespace parameter supported. function: {node.lhs[0]}.')
+
+        var = id_list.lhs[namespace_param_pos][0]
+        var = var.replace('*', '')
+        id_list.lhs.pop (namespace_param_pos)
+
+        assert(len (node.lhs[0].lhs) == 1)
+        funcname = node.lhs[0].lhs[0]
+
+        rfnd = ReplaceFunctionNamespaceData (var, namespace_param_pos, funcname)
+        namespace_modified_funcs[funcname] = rfnd
+
+        _tree_visit(
+            VisitorInfo (node),
+            function_scope_visiting_new,
+            function_scope_visitor_body,
+            rfnd)
+
+    # Now replacing calls on the outside scope
+    _tree_visit(
+        VisitorInfo (node),
+        non_function_scope_visiting_new,
+        non_function_scope_visitor_body,
+        namespace_modified_funcs)
 #-------------------------------------------------------------------------------
 def generate(
     ast,
@@ -2154,6 +2300,7 @@ def generate(
 
     runtime_header, lib_funcs = _generate_runtime_environment()
     sliders, slider_funcs = _parse_slider_code_section (slider_section_code)
+    _replace_single_parameter_namespaces_by_this (ast)
     _append_external_library_functions (lib_funcs, libfunc_files)
     _move_functions_to_top_of_blocks (ast, merge_block_and_samples)
     if merge_block_and_samples:

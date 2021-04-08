@@ -1,0 +1,6 @@
+@init
+function f() (
+    this = 3;
+);
+
+a.f();

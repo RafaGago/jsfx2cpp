@@ -41,7 +41,9 @@ The list below are just surprises that just popped up  due to lack of formal
 specification/documentation on the language. These JSFX features were found very
 late after successfuilly parsing many non-trivial JSFX scripts:
 
-* No function parameter namespaces. E.g. fn(namespace*, namespace*)
+* Only single function namespaces. E.g. fn(namespace*). The current
+  implementation is based on substituting by "this" and namespace calls when
+  possible.
 
 * Function overloads not supported. Again not possible because of lack of formal
   specification/documentation. Only found about its existance pretty late on the
