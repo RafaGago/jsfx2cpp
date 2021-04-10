@@ -2343,7 +2343,7 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
 
     # Now replacing calls on the outside scope
     _tree_visit(
-        VisitorInfo (node),
+        VisitorInfo (ast),
         non_function_scope_visiting_new,
         non_function_scope_visitor_body,
         namespace_modified_funcs)
