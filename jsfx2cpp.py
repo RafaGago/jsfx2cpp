@@ -69,6 +69,7 @@ def main():
     program, slider_jsfx = \
         jsfx_preprocess (main_jsfx, selected_sections, include_paths)
     if args.mode == 'preprocessor':
+        print ('\n'.join (slider_jsfx))
         print (program)
         return 0
 
