@@ -1,0 +1,12 @@
+@init
+
+function f (x) (
+    x;
+);
+
+function f (x, y) (
+    x + y;
+);
+
+f(1);
+f(1, 2);

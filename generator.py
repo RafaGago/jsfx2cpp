@@ -780,6 +780,70 @@ def _move_functions_to_top_of_blocks (head_node, merge_block_and_samples):
                 j += 1
             i += j - 1
         i += 1
+# ------------------------------------------------------------------------------
+def _suffix_function_overloads_with_a_substring (ast):
+    # To keep internal data strutures as simple as possible, function overloads
+    # are implemented by suffixing "|<n_params>" to the function names and then
+    # removing the suffix both for function names and calls on the generation
+    # step.
+    def visiting_new (info, _):
+        return VisitType.NODE_AFTER_LHS
+
+    def visitor_body (info, function_map):
+        # replaces variable occurences and calls inside the function
+        assert (type (info) == VisitorInfo)
+
+        if info.node.type == 'call':
+            assert (info.node.lhs[0].type == 'identifier')
+            call_key = _make_key(info.node.lhs[0].lhs)
+            n_params = len (info.node.rhs)
+
+            # Slow, but simple
+            for func_key, overload_set in function_map.items():
+                if len (overload_set) <= 1:
+                    continue
+
+                if call_key.endswith (func_key):
+                    if n_params not in overload_set:
+                        raise RuntimeError(
+                            f'Parameter number mismatch on function call: "{call_key}". Got: {n_params}. Expected: {overload_set}')
+                    suffix = '|overload_' + str (n_params)
+                    last_name_chunk = info.node.lhs[0].lhs[-1]
+                    info.node.lhs[0].lhs[-1] = last_name_chunk + suffix
+            return
+
+        if info.node.type == 'function':
+            funcname_arr = info.node.lhs[0].lhs
+            n_params = len (info.node.lhs[1].lhs)
+            funcname_key = _make_key (funcname_arr)
+            overload_set = function_map[funcname_key]
+            if len (overload_set) <= 1:
+                return
+            assert (n_params in overload_set)
+            suffix = '|overload_' + str (n_params)
+            funcname_arr[-1] = funcname_arr[-1] + suffix
+            return
+
+    functions = {}
+
+    # detect all functions overloads
+    for node in ast.lhs:
+        if node.type != 'function':
+            continue
+        funcname = _make_key (node.lhs[0].lhs)
+        n_params = len (node.lhs[1].lhs)
+
+        if funcname not in functions:
+            functions[funcname] = set()
+
+        functions[funcname].add(n_params)
+
+    # replace function names and calls
+    _tree_visit(
+        VisitorInfo (ast),
+        visiting_new,
+        visitor_body,
+        functions)
 #-------------------------------------------------------------------------------
 def _emulate_implicit_return_values (head_node):
     # The current implementation of implicit return values is based on making
@@ -1269,8 +1333,15 @@ def _generate_cpp (ast, codegen_context):
             # prepending the section
             fname = _make_key(f.lhs[0].lhs)
             fname_final = _make_key ([state.section, fname])
+
             state.enter_new_function (fname_final)
-            state.add_code (f'double {fname_final}')
+
+            fname_final_no_overload = fname_final
+            overload_str_beg_idx = fname_final.find ('|')
+            if (overload_str_beg_idx >= 0):
+                fname_final_no_overload = fname_final[0:overload_str_beg_idx]
+
+            state.add_code (f'double {fname_final_no_overload}')
             # parameters
             state.add_code ('(')
 
@@ -1337,9 +1408,17 @@ def _generate_cpp (ast, codegen_context):
                 if libcall is not None:
                     state.used_funcs.add (identifier);
                     identifier = libcall.cppfunc
-                state.add_code (f'{identifier} (')
+                call_key = identifier
             else:
-                state.add_code (f'{_make_key([call.section, call.function])} (')
+                call_key = _make_key([call.section, call.function])
+
+            # remove overload suffixes
+            call_key_no_overload = call_key
+            overload_str_beg_idx = call_key.find ('|')
+            if (overload_str_beg_idx >= 0):
+                call_key_no_overload = call_key[0:overload_str_beg_idx]
+
+            state.add_code (f'{call_key_no_overload} (')
 
             expr_last = len (info.node.rhs) - 1
             for idx, expr in enumerate (info.node.rhs):
@@ -2142,7 +2221,7 @@ def _merge_block_and_sample_sections (ast):
     seq.insert (block_end, loop)
     seq.insert (block_start + 1, block_length_assign)
 
-def _replace_single_parameter_namespaces_by_this(ast):
+def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
     # Try to have a minimal support for namespace function variables. This
     # function is not considering blocks and probably very flawed from a
     # theoretical perspective.
@@ -2271,7 +2350,7 @@ def _replace_single_parameter_namespaces_by_this(ast):
         id_list.lhs.pop (namespace_param_pos)
 
         assert(len (node.lhs[0].lhs) == 1)
-        funcname = node.lhs[0].lhs[0]
+        funcname = _make_key (node.lhs[0].lhs)
 
         rfnd = ReplaceFunctionNamespaceData (var, namespace_param_pos, funcname)
         namespace_modified_funcs[funcname] = rfnd
@@ -2300,7 +2379,8 @@ def generate(
 
     runtime_header, lib_funcs = _generate_runtime_environment()
     sliders, slider_funcs = _parse_slider_code_section (slider_section_code)
-    _replace_single_parameter_namespaces_by_this (ast)
+    _suffix_function_overloads_with_a_substring (ast)
+    _replace_single_parameter_namespaces_by_namespaced_calls (ast)
     _append_external_library_functions (lib_funcs, libfunc_files)
     _move_functions_to_top_of_blocks (ast, merge_block_and_samples)
     if merge_block_and_samples:
