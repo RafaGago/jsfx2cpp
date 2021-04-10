@@ -2259,8 +2259,6 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
             return
 
     def non_function_scope_visiting_new (info, _):
-        if info.node.type == 'call' or info.node.type == 'function':
-            return VisitType.NODE_ONLY
         return VisitType.NODE_AFTER_LHS
 
     def non_function_scope_visitor_body (info, rfnd_map):

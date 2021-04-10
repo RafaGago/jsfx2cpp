@@ -37,15 +37,16 @@ Deliberate known issues/omissions:
 
 Non-deliberate known issues/omissions:
 
-The list below are just surprises that just popped up  due to lack of formal
-specification/documentation on the language. These JSFX features were found very
-late after successfuilly parsing many non-trivial JSFX scripts:
-
 * Only single function namespaces. E.g. fn(namespace*). The current
   implementation is based on substituting by "this" and namespace calls when
-  possible.
+  possible. This JSFX features was found very late on the development cycle after successfully parsing  many non-trivial JSFX scripts. It is a non documented a
+  seldomly used feature.
 
-While fixeable, these features are sparsely used and the generator fails loudly,
-so I'm temporarilly editing the scripts that don't translate manually before
-deciding if doing things right is worth the effort. Both appeared on some
-Geraint Luff's scripts.
+* Another feature I found very late. On JSFX calling a function with less
+  parameters than the function expects succeeds by defaulting missing parameters
+  to 0. I didn't even bother checking parameter counts as I was assuming that
+  correct JSFX code would never do that. Just add explicit 0's for missing
+  parameterson the generated code.
+
+* Generated (because of namespace usage) function parameter variable names can
+  collide. Everything is fine at the call site.
