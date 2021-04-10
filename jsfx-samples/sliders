@@ -1,0 +1,6 @@
+slider1:param_a=0.5<0,1>-Param B
+slider2:param_b=0.5<0,1>-Param A
+
+@init
+
+x = param_a + param_b
