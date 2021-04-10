@@ -304,10 +304,27 @@ def _name_from_key (key):
     # var
     return key.split ('$')
 
+# It could we used in more places. It was added in a late stage and weakly typed
+# languages are a PITA to refactor.
+class Function:
+    def __init__(self, name, section):
+        assert (type (name) == str)
+        assert (type (section) == str)
+        self.name = name
+        self.section = section
+
+    def __str__(self):
+        return self.section + '::' + self.name
+
+    def __eq__ (self, other):
+        return isinstance (other,Function) and str (self) == str (other)
+
+    def __hash__ (self):
+        return hash (str (self))
+
 class FunctionCall:
-    def __init__(self, function_section, function, call_namespace):
-        self.section = function_section
-        self.function = function
+    def __init__(self, function_section, function_name, call_namespace):
+        self.function = Function (function_name, function_section)
         self.call_namespace = call_namespace
         self.instance_variable_refs = [] # variable names to pass on this call.
         #self.assignment_to_tree = assignment_tree
@@ -338,7 +355,7 @@ class FunctionCall:
 
     def __repr__(self):
         s = self
-        return f'bl:{s.section}, func:{s.function}, nspc:{s.call_namespace}, refs:{s.instance_variable_refs}'
+        return f'func:{s.function}, nspc:{s.call_namespace}, refs:{s.instance_variable_refs}'
 
 class Sections:
     # holds JSFX section info, variables, functions and function calls, etc.
@@ -412,7 +429,7 @@ class Sections:
     def add_call (self, section, node, call):
         assert (type (call) == FunctionCall)
         self.sd[section]['_$calls'][node.id] = call
-        traits, _ = self.find_function_traits (section, call.function)
+        traits, _ = self.find_function_traits (section, call.function.name)
         required_variables = call.append_required_instance_variables (traits)
         for var in required_variables:
             self.classify_variable_reference (section, var)
@@ -484,7 +501,25 @@ class Sections:
                 namespace = namespace if namespace != '' else funcname
                 return FunctionCall (fsection, funcname, namespace)
 
-        return None # a call to something external function
+        return None # a call to some external function
+
+    def get_dependant_functions (self, function):
+        assert (type (function) is Function)
+        deps = set()
+        visit_sets = [set ([function])]
+
+        for visit_set in visit_sets:
+            for func in visit_set:
+                if func in deps:
+                    continue
+                deps.add (func)
+                ft, _ = self.find_function_traits (func.section, func.name)
+                if not ft:
+                    continue
+                assert (type (ft) == FunctionTraits)
+                visit_sets.append (ft.get_dependencies())
+
+        return deps
 
 class FunctionTraits:
     def __init__(self):
@@ -596,6 +631,13 @@ class FunctionTraits:
                     continue
                 self.globals.append (variable)
 
+    def get_dependencies (self):
+        deps = set()
+        for _, call in self.calls.items():
+            assert (type (call) == FunctionCall)
+            deps.add (call.function)
+        return deps
+
     def __repr__(self):
         s = self
         return f'p:{s.parameters}, loc:{s.local}, gl:{s.globals}, ins:{s.instance}, ins_u:{s.instance_unchecked}, parnt:{s.parent_instance}, inh:{s.inherited}, call:{s.calls.values()}'
@@ -606,7 +648,7 @@ class DetectVariablesState:
         self.function_key = None
 
 #-------------------------------------------------------------------------------
-def _register_functions_and_variables (sections, head_node):
+def _register_functions_and_non_function_global_vars (sections, head_node):
     # Creates the Sections data structure, that will contain all the required
     # variables and extra parameters to pass on function calls to emulate
     # JSFX function namespacing.
@@ -615,13 +657,19 @@ def _register_functions_and_variables (sections, head_node):
     # the extra instance parameters to functions as C++ references.
     #
     # These parameters will get stored on FunctionCall objects, stored on
-    # dictionaries indexed by Node, so the code generator can easily find them.
-    # Calls on the global scope are stored on the "_$calls" dictionary for each
-    # section on the "Sections" object. Calls on function scope are stored on each
-    # "FunctionTraits" object, under the "calls" dictionary.
+    # dictionaries indexed by Node id, so the code generator can easily find
+    # them.
     #
-    # Until the previous separator (#----<till 80 chars>) all code is to achieve
-    # this.
+    # Calls on the global scope are stored on the "_$calls" dictionary of the
+    # "Sections" object (for each jsfx section). Calls on function scope are
+    # stored on each "FunctionTraits" object, under the "calls" dictionary.
+    #
+    # After this call all the functions and variables have been registered
+    # except the global variables inside functions, which are stored only on
+    # each "FunctionTraits" object but not yet on the variable dictionaries
+    # (under the '_$num' key) of the "Section" object. This is to allow another
+    # pass detecting if functions are used or not to add them after
+    # verification. Doing both steps here could result in more complex code.
     #
     # Random notes about functions:
     #
@@ -629,13 +677,13 @@ def _register_functions_and_variables (sections, head_node):
     #  I assume valid JSFX and ignore it.
     #
     # - functions can be shadowed, but there is only one set of instance
-    #   variables, so the function names have to be prefixed with the section, but
-    #   the variable names don't.
+    #   variables, so the function names have to be prefixed with the section,
+    #   but the variable names don't.
     #
-    # -"local" variables are stateful between calls, and each section has one set
-    #  of them. I will implement them as just static variables and ignore this
-    #  behavior. If this becomes a problem, then one easy workaround could be
-    #  to redefine every function on @init on each section and then manually
+    # -"local" variables are stateful between calls, and each section has one
+    #  set of them. I will implement them as just static variables and ignore
+    #  this behavior. If this becomes a problem, then one easy workaround could
+    #  be to redefine every function on @init on each section and then manually
     #  remove those that are unused. TODO: add some kind of warning to detect
     #  that a function uses locals state between calls (detect if locals appear
     #  on LHS or RHS of an assignment first).
@@ -723,7 +771,7 @@ def _register_functions_and_variables (sections, head_node):
             )
         assert (type (thisfunc) == FunctionTraits)
         called_traits, _ = state.sections.find_function_traits(
-            called.section, called.function
+            called.function.section, called.function.name
             )
         assert (type (called_traits) == FunctionTraits)
         thisfunc.add_call (info.node, called, called_traits)
@@ -734,22 +782,85 @@ def _register_functions_and_variables (sections, head_node):
     visit_state = VisitorGlobalState()
     for node in head_node.lhs:
         if node.type == 'function':
-            key, traits = sections.add_new_function (visit_state.section, node)
+            key, _ = sections.add_new_function (visit_state.section, node)
             state.function_key = key
             info = VisitorInfo (node.rhs[0], node, state=visit_state)
             visit_state = _tree_visit(
                 info, visiting_new, function_visitor_detect_vars, state)
             visit_state = _tree_visit(
                 info, visiting_new, function_visitor_detect_calls, state)
-            # manually adding the generated global variables after the function
-            # has been visited.
-            for globalv in traits.globals:
-                sections.classify_variable_reference(
-                    visit_state.section, globalv)
         else:
             info = VisitorInfo (node, head_node, state=visit_state)
             visit_state = \
                 _tree_visit (info, visiting_new, global_visitor, state)
+# ------------------------------------------------------------------------------
+def _remove_unused_functions_and_add_function_global_vars (ast, sections):
+    # removes unused functions.
+
+    assert (type (ast) == Node)
+    assert (type (sections) == Sections)
+    assert (ast.type == 'seq')
+
+    class VisitData:
+        def __init__(self, sections):
+            assert (type (sections) == Sections)
+            self.sections = sections
+            self.section = ''
+            self.used_functions = set()
+
+        def add_function(self, name):
+            self.used_functions.add (Function (name, self.section))
+
+    def visiting_new (info, _):
+        if info.node.type == 'function':
+            return VisitType.NODE_ONLY
+        return VisitType.NODE_FIRST
+
+    def visitor (info, visit_data):
+        assert (type (info) == VisitorInfo)
+        assert (type (visit_data) == VisitData)
+
+        if info.node.type == 'section':
+            visit_data.section = info.state.section
+
+        if info.node.type != 'call':
+            return
+
+        assert (info.node.lhs[0].type == 'identifier')
+        identifier = info.node.lhs[0].lhs
+        call = visit_data.sections.try_solve_call(
+            info.state.section, _make_key (identifier)
+            )
+        if call is None:
+            return
+
+        visit_data.used_functions.add (call.function)
+        deps = visit_data.sections.get_dependant_functions (call.function)
+        visit_data.used_functions |= deps
+
+    visit_data = VisitData (sections)
+    _tree_visit (VisitorInfo (ast), visiting_new, visitor, visit_data)
+
+    section = ''
+    for node in ast.lhs:
+        # asumming working JSFX, so functions declarations don't appear on weird
+        # scopes.
+        if node.type == 'section':
+            section = node.lhs
+            continue
+
+        if node.type != 'function':
+            continue
+
+        assert (node.lhs[0].type == 'identifier')
+        uf = Function (_make_key (node.lhs[0].lhs), section)
+        if uf not in visit_data.used_functions:
+            node.reset ('nop', [])
+        else:
+            traits, _ = sections.find_function_traits (section, uf.name)
+            for globalv in traits.globals:
+                sections.classify_variable_reference(
+                    section, globalv)
 #-------------------------------------------------------------------------------
 def _move_functions_to_top_of_blocks (head_node, merge_block_and_samples):
     functions = {
@@ -1310,6 +1421,11 @@ def _generate_cpp (ast, codegen_context):
         assert (type (info) == VisitorInfo)
         assert (type (state) == CodegenContext)
 
+        if info.node.type == 'nop':
+            # just added for convenience to be able to erase nodes when
+            # iterating
+            return
+
         if info.node.type == 'section':
             # This code does many manual calls of the visitor, so it keeps
             # track of the current section by itself.
@@ -1426,7 +1542,8 @@ def _generate_cpp (ast, codegen_context):
                     identifier = libcall.cppfunc
                 call_key = identifier
             else:
-                call_key = _make_key([call.section, call.function])
+                call_key = _make_key(
+                    [call.function.section, call.function.name])
             state.add_code (f'{call_key} (')
 
             expr_last = len (info.node.rhs) - 1
@@ -2423,7 +2540,8 @@ def generate(
     specvar_funcs = \
         _replace_jsfx_special_variables_by_stub_calls (ast, specialvars)
     sections =_init_jsfx_sections (ast)
-    _register_functions_and_variables (sections, ast)
+    _register_functions_and_non_function_global_vars (sections, ast)
+    _remove_unused_functions_and_add_function_global_vars (ast, sections)
     _emulate_implicit_return_values (ast)
     _handle_if_assignments_on_lhs (ast)
     _use_compound_assignments (ast)
