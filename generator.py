@@ -90,13 +90,14 @@ class VisitType(Enum):
     # Notice, visits of LHS and RHS are recursive all the way to the bottom, so
     # e.g. visiting the node after the LHS means that all the LHS has been
     # traveled.
-    NODE_FIRST          = 1, # visits parent, LHS, then RHS
-    NODE_AFTER_LHS      = 2, # visits LHS, parent, then RHS
-    NODE_AFTER_RHS      = 3, # visits LHS, RHS, then parent
-    NODE_ALL            = 4, # visits parent, LHS, parent, RHS, parent
-    NODE_BOTH_SIDES     = 5, # visits parent, LHS, RHS, parent
-    NODE_ONLY           = 6, # visits only the parent, breaks the recursion
-    NODE_ALL_EXCEPT_RHS = 7, # visits LHS and parent
+    NODE_FIRST                = 1, # visits parent, LHS, then RHS
+    NODE_AFTER_LHS            = 2, # visits LHS, parent, then RHS
+    NODE_AFTER_RHS            = 3, # visits LHS, RHS, then parent
+    NODE_ALL                  = 4, # visits parent, LHS, parent, RHS, parent
+    NODE_BOTH_SIDES           = 5, # visits parent, LHS, RHS, parent
+    NODE_CENTER_AND_AFTER_LHS = 6, # visits LHS, parent, RHS, parent
+    NODE_ONLY                 = 7, # visits only the parent, breaks recursion
+    NODE_ALL_EXCEPT_RHS       = 8, # visits LHS and parent
 
 # visits the tree
 #
@@ -161,6 +162,7 @@ def _tree_visit(
         info.node.lhs, visiting_new, visit, visit_state, info, on_lhs=True
         )
     if visit_t is VisitType.NODE_AFTER_LHS or \
+        visit_t is VisitType.NODE_CENTER_AND_AFTER_LHS or \
         visit_t is VisitType.NODE_ALL or \
         visit_t is VisitType.NODE_ALL_EXCEPT_RHS:
 
@@ -173,6 +175,7 @@ def _tree_visit(
         info.node.rhs, visiting_new, visit, visit_state, info, on_lhs=False
         )
     if visit_t is VisitType.NODE_AFTER_RHS or \
+        visit_t is VisitType.NODE_CENTER_AND_AFTER_LHS or \
         visit_t is VisitType.NODE_ALL or \
         visit_t is VisitType.NODE_BOTH_SIDES:
 
@@ -2230,89 +2233,129 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
     # like I want to spend the necessary time to properly refactor/redesign to
     # add this feature, as it is sparsely used by script writers.
 
-    class ReplaceFunctionNamespaceData:
-        def __init__ (self, var, pos, func):
-            self.varname = var
+    class FunctionNamespaceParameterData:
+        def __init__ (self, var_array, pos, funcname_array):
+            assert(type (var_array) is list)
+            assert(type (funcname_array) is list)
+            self.varname_array = var_array
             self.varpos = pos
-            self.funcname = func
+            self.funcname_array = funcname_array
 
-    def function_scope_visiting_new (info, _):
+    class VisitData:
+        def __init__(self):
+            self.reset ([], None)
+            self.fnpd_map = {}
+
+        def reset (self, funcname, fpnd):
+            assert(
+                type (fpnd) is FunctionNamespaceParameterData or fpnd is None)
+            assert (type (funcname) is list)
+            self.fnpd = fpnd
+            self.current_funcname_array = funcname
+
+    def visiting_new (info, _):
+        if info.node.type == 'function':
+            return VisitType.NODE_CENTER_AND_AFTER_LHS
         return VisitType.NODE_AFTER_LHS
 
-    def function_scope_visitor_body (info, rfnd):
+    def visitor_body (info, visitdata):
         # replaces variable occurences and calls inside the function
         assert (type (info) == VisitorInfo)
-        assert (type (rfnd) == ReplaceFunctionNamespaceData)
+        assert (type (visitdata) == VisitData)
 
-        if info.node.type == 'identifier' and info.parent.type != 'call':
-            identifier = info.node.lhs[0]
-            if identifier != rfnd.varname:
+        if info.node.type == 'function':
+            funcname_arr = info.node.lhs[0].lhs
+            if funcname_arr == visitdata.current_funcname_array:
+                # exiting a function, the RHS is already travelled
+                visitdata.current_function = []
+                visitdata.fnpd = None
+            else:
+                # entering a function body, the LHS is already travelled
+                visitdata.current_function = funcname_arr
+                visitdata.fnpd =  \
+                    visitdata.fnpd_map.get (_make_key (funcname_arr))
+            return
+
+        if info.node.type == 'identifier' \
+            and info.parent.type != 'call' \
+            and visitdata.fnpd is not None:
+            # just searching to replace variable identifiers on functions with
+            # namespace parameters.
+
+            identifier = info.node.lhs
+            id_key = _make_key (identifier)
+            varname_key = _make_key (visitdata.fnpd.varname_array)
+
+            if not id_key.startswith (varname_key):
                 return
 
-            info.node.lhs[0] = identifier.replace (rfnd.varname, 'this')
+            info.node.lhs =  \
+                ['this'] + info.node.lhs[len (visitdata.fnpd.varname_array):]
             return
 
         if info.node.type == 'call':
-            funcname_array = info.node.lhs[0].lhs
-            parameter_expression_array = info.node.rhs
+            callname_array = info.node.lhs[0].lhs
+            callkey = _make_key (callname_array)
 
-            match_node = None
-            for node in parameter_expression_array:
-                if node.type != 'identifier':
-                    continue
-                if node.lhs[0] == rfnd.varname:
-                    match_node = node
+            called_fnpd = None
+            for fnpd in visitdata.fnpd_map.values():
+                funckey = _make_key (fnpd.funcname_array)
+                if callkey.endswith (funckey):
+                    # function has a namespace parameter
+                    funcname_array = fnpd.funcname_array
+                    called_fnpd = fnpd
+
+            if called_fnpd is None:
+                # the called function has no namespace parameters, pass
+                return
+
+            if callname_array[0] == 'this':
+                raise RuntimeError(
+                    f'error when replacing namespace variable {called_fnpd.varname} on {callkey} by a namespaced call: "this" already present')
+
+            if len (funcname_array) > 1:
+                # There is no register of all available functions yet. Tt could
+                # be done, but trying an incomplete simpler implementation
+                # first.
+                raise RuntimeError(
+                    f'The early function namespace replacement pass can\'t distinguish namespaced function calls from function names with dots in between: {callkey}')
+
+            call_param_expr_array = info.node.rhs
+            assert (len (call_param_expr_array) >= called_fnpd.varpos)
+            if call_param_expr_array[called_fnpd.varpos].type != 'identifier':
+                raise RuntimeError(
+                    f'on call: "{callkey}". parameter {fnpd.varpos} was expected to be an identifier when replacing namespace variable')
+
+            nspace = None
+            if visitdata.fnpd is not None:
+                # inside a function with namespace variables. Maybe the
+                # f(namespace*) call has to be translated to "this.f()" instead
+                # of "namespace.f()".
+                for idx, node in enumerate (call_param_expr_array):
+                    if node.type != 'identifier':
+                        continue
+
+                    if _make_key (node.lhs) != \
+                            _make_key (visitdata.fnpd.varname_array):
+                        continue
+
+                    nspace = ['this']
+                    # the parameter is passed to another function with namespace
+                    # parameters. Assert that indexes match.
+                    assert (idx == called_fnpd.varpos)
                     break
 
-            if not match_node:
-                return
-            if funcname_array[0] == 'this':
-                raise RuntimeError(
-                    f'error when replacing namespace variable {rfnd.varname} on {funcname_array.join(".")}: "this" already present')
+            # function parameter namespace replacement.
+            if not nspace:
+                nspace = call_param_expr_array[fnpd.varpos].lhs
+            call_param_expr_array.pop (fnpd.varpos)
+            info.node.lhs[0].lhs = nspace + funcname_array
 
-            info.node.lhs[0].lhs = ['this'] + funcname_array
-            parameter_expression_array.remove (match_node)
-            return
+        return # end of function marker
 
-    def non_function_scope_visiting_new (info, _):
-        if info.node.type == 'function':
-            return VisitType.NODE_ONLY
-        return VisitType.NODE_AFTER_LHS
+    visit_data = VisitData()
 
-    def non_function_scope_visitor_body (info, rfnd_map):
-        # replaces variable occurences and calls inside the function
-        assert (type (info) == VisitorInfo)
-        if info.node.type != 'call':
-            return
-
-        funcname_array = info.node.lhs[0].lhs
-        parameter_expression_array = info.node.rhs
-        call = funcname_array[-1]
-
-        if call not in rfnd_map:
-            return
-
-        if len (funcname_array) > 1:
-            raise RuntimeError(
-                f'"{call}" is already called from a namespace while trying to replace namespace variable: {funcname_array}')
-
-        rfnd = rfnd_map[call]
-        assert (type (rfnd) == ReplaceFunctionNamespaceData)
-
-        assert (len(parameter_expression_array) >= rfnd.varpos)
-        if parameter_expression_array[rfnd.varpos].type != 'identifier':
-            raise RuntimeError(
-                f'on call: "{call}". parameter {rfnd.varpos} was expected to be an identifier when replacing namespace variable')
-
-        nspace = parameter_expression_array[rfnd.varpos].lhs
-        parameter_expression_array.pop (rfnd.varpos)
-        info.node.lhs[0].lhs = nspace + funcname_array
-
-    # First visiting and patching the functions themselves for namespace
-    # parameters. Then doing a global call replace.
-
-    namespace_modified_funcs = {}
-
+    # This loop scans for functions with namespace parameters and saves the data
     for node in ast.lhs:
         # functions are always on the top level. No need to complicate the visitor.
         if node.type != 'function':
@@ -2330,7 +2373,7 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
                 #x.y.z: ignoring
                 continue
             assert (len (identifier) > 0)
-            if identifier[0].endswith('*'):
+            if identifier[-1].endswith('*'):
                 namespace_params += 1
                 namespace_param_pos = idx
 
@@ -2341,28 +2384,21 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
             raise RuntimeError(
                 f'only one namespace parameter supported. function: {node.lhs[0]}.')
 
-        var = id_list.lhs[namespace_param_pos][0]
-        var = var.replace('*', '')
+        # remove parameter
+        var = id_list.lhs[namespace_param_pos]
+        var[-1] = var[-1].replace('*', '')
         id_list.lhs.pop (namespace_param_pos)
 
         assert(len (node.lhs[0].lhs) == 1)
-        funcname = _make_key (node.lhs[0].lhs)
+        funcname_array = node.lhs[0].lhs
 
-        rfnd = ReplaceFunctionNamespaceData (var, namespace_param_pos, funcname)
-        namespace_modified_funcs[funcname] = rfnd
+        # store for visit
+        fnpd = FunctionNamespaceParameterData(
+            var, namespace_param_pos, funcname_array)
+        visit_data.fnpd_map[_make_key (funcname_array)] = fnpd
 
-        _tree_visit(
-            VisitorInfo (node),
-            function_scope_visiting_new,
-            function_scope_visitor_body,
-            rfnd)
-
-    # Now replacing calls on the outside scope
-    _tree_visit(
-        VisitorInfo (ast),
-        non_function_scope_visiting_new,
-        non_function_scope_visitor_body,
-        namespace_modified_funcs)
+    # The actual replacement is done on the visitor
+    _tree_visit (VisitorInfo (ast), visiting_new, visitor_body, visit_data)
 #-------------------------------------------------------------------------------
 def generate(
     ast,
