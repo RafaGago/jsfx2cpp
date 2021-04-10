@@ -313,7 +313,6 @@ class FunctionCall:
         # Fills the extra function parameters needed to emulate JSFX "instance"
         # pseudo object orientation.
         assert (type (traits) == FunctionTraits)
-
         if len (traits.instance) == 0 and  len (traits.inherited) == 0:
             return [] # Called function uses no namespacing. No parameters.
 
@@ -322,9 +321,16 @@ class FunctionCall:
         call_params = [_make_key([namespace, x]) for x in traits.instance]
         call_params_i = [_make_key([namespace, x]) for x in traits.inherited]
         for var in call_params + call_params_i:
-            var = var.replace ('this$', '')
+            # avoid namespace to namespace concatentations. When functions are
+            # chaining calls to functions this can happen.
+            var = var.replace ('this$this$', 'this$')
+            if var.endswith ('$this$'):
+                # when assignments/reads happen directly on the namespace
+                # variable (this) inside a function we get "<variable>$this$".
+                var = var[:-len('$this$')]
             variables.append (var)
             self.instance_variable_refs.append (var)
+
         return variables
 
     def __repr__(self):
@@ -504,10 +510,8 @@ class FunctionTraits:
                 if name[1] == '..':
                     #TODO: fail if '..' appears on other places than after 'this'
                     idtype = 'parent_instance'
-                    name = name[2:]
                 else:
                     idtype = 'instance'
-                    name = name[1:]
             else:
                 idtype = 'instance'
                 name = ['this$']
@@ -538,20 +542,32 @@ class FunctionTraits:
             self.parent_instance.add (key)
         return name
 
-    def add_call (self, node, called, traits):
+    def add_call (self, node, called, called_traits):
           # NOTICE: parent declarations by this.. are not implemented. My
           # intention is to avoid them.
         assert (type (node) == Node)
         assert (type (called) == FunctionCall)
-        assert (type (traits) == FunctionTraits)
+        assert (type (called_traits) == FunctionTraits)
 
         self.calls[node.id] = called
+        instance_vars = \
+            called.append_required_instance_variables (called_traits)
 
-        instance_vars = called.append_required_instance_variables (traits)
         if len (instance_vars) == 0:
             return # Function uses no namespacing
 
         # Extra variables required.
+
+        # Adding an extra parameter to pass by ref to this function.
+        # Not adding the same parameters twice. E.g. on: x.f(); x.f();
+        #
+        # Notice that parameters can alias too, e.g. x.f(); x.y(); can
+        # have both forward down a parameter called "x", so a parameter
+        # is not needed twice even if it comes from different functions.
+        #
+        # This is exactly the reason why making structs of all the
+        # instance parameters is a bad idea.
+
         if self.key_matches_on_instance_namespaces (called.call_namespace) or \
             called.call_namespace == 'this':
             # Inherited variables will be forwarded down to the caller of this
@@ -559,7 +575,10 @@ class FunctionTraits:
             # function signature as passed-by-reference.
             # e.g. "x.f()" on this scope forwards down whatever f() has as
             # "x.<anything from f>"
-            variable_type_list = self.inherited
+            for variable in instance_vars:
+                if variable in self.inherited or variable in self.instance:
+                    continue
+                self.inherited.append (variable)
         else:
             # New global variables with the name of the namespace they were
             # called from. e.g. "x.f() -> creates globals called x.<whatever>"
@@ -569,41 +588,14 @@ class FunctionTraits:
             #
             # Notice that on JSFX "local" variables don't participate on
             # namespacing. We don't need to check on self.local
-            variable_type_list = self.globals
-
-        for variable in instance_vars:
-            if variable in variable_type_list:
-                continue
-            # Adding an extra parameter to pass by ref to this function.
-            # Not adding the same parameters twice. E.g. on: x.f(); x.f();
-            #
-            # Notice that parameters can alias too, e.g. x.f(); x.y(); can
-            # have both forward down a parameter called "x", so a parameter
-            # is not needed twice even if it comes from different functions.
-            #
-            # This is exactly the reason why making structs of all the
-            # instance parameters is a bad idea.
-            variable_type_list.append (variable.replace ('this$', ''))
+            for variable in instance_vars:
+                if variable in self.globals:
+                    continue
+                self.globals.append (variable)
 
     def __repr__(self):
         s = self
         return f'p:{s.parameters}, loc:{s.local}, gl:{s.globals}, ins:{s.instance}, ins_u:{s.instance_unchecked}, parnt:{s.parent_instance}, inh:{s.inherited}, call:{s.calls.values()}'
-
-def _init_jsfx_sections (head_node):
-    # just making sure that each section is created before accessing
-    assert (type (head_node) == Node)
-
-    def visiting_new (info, _):
-        return VisitType.NODE_FIRST
-
-    def visitor (info, sections):
-        assert (type (info) == VisitorInfo)
-        if info.node.type == 'section':
-            sections.add_section (info.state.section)
-
-    sections = Sections()
-    _tree_visit (VisitorInfo (head_node), visiting_new, visitor, sections)
-    return sections
 
 class DetectVariablesState:
     def __init__(self, sections):
@@ -690,39 +682,48 @@ def _register_functions_and_variables (sections, head_node):
                 return
             state.sections.add_call (info.state.section, info.node, call)
 
-    def function_visitor(info, state):
+    def function_visitor_detect_vars (info, state):
         assert (type (info) == VisitorInfo)
         assert (type (state) == DetectVariablesState)
 
-        if info.node.type == 'identifier':
-            if info.parent.type == 'call' and info.on_lhs:
-                # identifiers on function calls have already been processed on
-                # the "call" section, as they need resolution .e.g what is
-                # this.x.y.z(a) a call to "z" from "this.x.y"? a call to "y.z"
-                # from "this.x"?
-                return
-            thisfunc, _ = state.sections.find_function_traits(
-                info.state.section, state.function_key
-                )
-            newname = thisfunc.add_variable (info.node.lhs)
-            # "this." and "this.."" may get dropped from the name
-            info.node.lhs = newname
+        if info.node.type != 'identifier':
+            return
+        if info.parent.type == 'call' and info.on_lhs:
+            # identifiers on function calls not handled here. They need
+            # resolution .e.g what is this.x.y.z(a) a call to "z" from
+            # "this.x.y"? a call to "y.z" from "this.x"?
+            return
+        thisfunc, _ = state.sections.find_function_traits(
+            info.state.section, state.function_key
+            )
+        newname = thisfunc.add_variable (info.node.lhs)
+        # "this." and "this.."" may get dropped from the name
+        info.node.lhs = newname
 
-        if info.node.type == 'call':
-            identifier = info.node.lhs[0].lhs
-            called = state.sections.try_solve_call(
-                info.state.section, _make_key (identifier))
-            if not called:
-                # E.g. calling some JSFX function that has to be emulated
-                return
-            thisfunc, _ = state.sections.find_function_traits(
-                info.state.section, state.function_key
-                )
-            assert (type (thisfunc) == FunctionTraits)
-            traits, _ = state.sections.find_function_traits(
-                called.section, called.function
-                )
-            thisfunc.add_call (info.node, called, traits)
+    def function_visitor_detect_calls (info, state):
+        assert (type (info) == VisitorInfo)
+        assert (type (state) == DetectVariablesState)
+
+        if info.node.type != 'call':
+            return
+
+        identifier = info.node.lhs[0].lhs
+        called = state.sections.try_solve_call(
+            info.state.section, _make_key (identifier))
+
+        if not called:
+            # E.g. calling some JSFX function that has to be emulated
+            return
+        assert (type (called) == FunctionCall)
+        thisfunc, _ = state.sections.find_function_traits(
+            info.state.section, state.function_key
+            )
+        assert (type (thisfunc) == FunctionTraits)
+        called_traits, _ = state.sections.find_function_traits(
+            called.section, called.function
+            )
+        assert (type (called_traits) == FunctionTraits)
+        thisfunc.add_call (info.node, called, called_traits)
 
     state = DetectVariablesState (sections)
     # This function makes multiple "_tree_visit" calls, so we manually pass
@@ -733,8 +734,10 @@ def _register_functions_and_variables (sections, head_node):
             key, traits = sections.add_new_function (visit_state.section, node)
             state.function_key = key
             info = VisitorInfo (node.rhs[0], node, state=visit_state)
-            visit_state = \
-                _tree_visit (info, visiting_new, function_visitor, state)
+            visit_state = _tree_visit(
+                info, visiting_new, function_visitor_detect_vars, state)
+            visit_state = _tree_visit(
+                info, visiting_new, function_visitor_detect_calls, state)
             # manually adding the generated global variables after the function
             # has been visited.
             for globalv in traits.globals:
@@ -780,6 +783,22 @@ def _move_functions_to_top_of_blocks (head_node, merge_block_and_samples):
                 j += 1
             i += j - 1
         i += 1
+# ------------------------------------------------------------------------------
+def _init_jsfx_sections (head_node):
+    # just making sure that each section is created before accessing
+    assert (type (head_node) == Node)
+
+    def visiting_new (info, _):
+        return VisitType.NODE_FIRST
+
+    def visitor (info, sections):
+        assert (type (info) == VisitorInfo)
+        if info.node.type == 'section':
+            sections.add_section (info.state.section)
+
+    sections = Sections()
+    _tree_visit (VisitorInfo (head_node), visiting_new, visitor, sections)
+    return sections
 # ------------------------------------------------------------------------------
 def _suffix_function_overloads_with_a_substring (ast):
     # To keep internal data strutures as simple as possible, function overloads
@@ -2218,9 +2237,6 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
             self.funcname = func
 
     def function_scope_visiting_new (info, _):
-        if info.node.type == 'call':
-            return VisitType.NODE_ONLY
-
         return VisitType.NODE_AFTER_LHS
 
     def function_scope_visitor_body (info, rfnd):
@@ -2228,7 +2244,7 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
         assert (type (info) == VisitorInfo)
         assert (type (rfnd) == ReplaceFunctionNamespaceData)
 
-        if info.node.type == 'identifier':
+        if info.node.type == 'identifier' and info.parent.type != 'call':
             identifier = info.node.lhs[0]
             if identifier != rfnd.varname:
                 return
@@ -2259,6 +2275,8 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
             return
 
     def non_function_scope_visiting_new (info, _):
+        if info.node.type == 'function':
+            return VisitType.NODE_ONLY
         return VisitType.NODE_AFTER_LHS
 
     def non_function_scope_visitor_body (info, rfnd_map):
