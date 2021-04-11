@@ -2054,9 +2054,10 @@ def _generate_class_file(
         )
 
     ret += headers
-    ret += external_header
 
-    ret += ['struct jsfx_process {']
+    # ommitting slider header
+    # ret += external_header
+    ret += ['\nstruct jsfx_process {']
     add_separator (ret)
     ret += global_runtime
     add_separator (ret)
