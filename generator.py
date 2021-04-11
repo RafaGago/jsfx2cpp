@@ -263,7 +263,7 @@ def _flatten_multiple_assignments_in_expression (head_node):
     def visitor(info, assign_lst):
         assert (type (info) == VisitorInfo)
 
-        if info.node.type == '=':
+        if info.node.type == '=' and info.parent.type != 'if':
             assign_lst.append (info)
 
         elif info.node.type == 'seq':
