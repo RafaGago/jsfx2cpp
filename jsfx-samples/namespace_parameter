@@ -1,5 +1,4 @@
 @init
-
 function f2 (x*) (
     x.y;
 );
@@ -12,5 +11,10 @@ function f (x*) local (n) (
     n = pow (f2(paco), 4.);
 );
 
+function f3 (a, x*) (
+    x.y = a;
+);
+
 f(paco);
 f2(paco);
+f3(1, paco);

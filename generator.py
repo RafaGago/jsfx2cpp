@@ -2384,12 +2384,12 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
         if info.node.type == 'function':
             funcname_arr = info.node.lhs[0].lhs
             if funcname_arr == visitdata.current_funcname_array:
-                # exiting a function, the RHS is already travelled
-                visitdata.current_function = []
+                # exiting a function, LHS and RHS are visited
+                visitdata.current_funcname_array = []
                 visitdata.fnpd = None
             else:
-                # entering a function body, the LHS is already travelled
-                visitdata.current_function = funcname_arr
+                # entering a function body, the LHS is already visited
+                visitdata.current_funcname_array = funcname_arr
                 visitdata.fnpd =  \
                     visitdata.fnpd_map.get (_make_key (funcname_arr))
             return
@@ -2402,9 +2402,9 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
 
             identifier = info.node.lhs
             id_key = _make_key (identifier)
-            varname_key = _make_key (visitdata.fnpd.varname_array)
+            nspace_varname_key = _make_key (visitdata.fnpd.varname_array)
 
-            if not id_key.startswith (varname_key):
+            if not id_key.startswith (nspace_varname_key):
                 return
 
             info.node.lhs =  \
@@ -2414,7 +2414,6 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
         if info.node.type == 'call':
             callname_array = info.node.lhs[0].lhs
             callkey = _make_key (callname_array)
-
             called_fnpd = None
             for fnpd in visitdata.fnpd_map.values():
                 funckey = _make_key (fnpd.funcname_array)
@@ -2432,7 +2431,7 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
                     f'error when replacing namespace variable {called_fnpd.varname} on {callkey} by a namespaced call: "this" already present')
 
             if len (funcname_array) > 1:
-                # There is no register of all available functions yet. Tt could
+                # There is no register of all available functions yet. It could
                 # be done, but trying an incomplete simpler implementation
                 # first.
                 raise RuntimeError(
@@ -2465,8 +2464,8 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
 
             # function parameter namespace replacement.
             if not nspace:
-                nspace = call_param_expr_array[fnpd.varpos].lhs
-            call_param_expr_array.pop (fnpd.varpos)
+                nspace = call_param_expr_array[called_fnpd.varpos].lhs
+            call_param_expr_array.pop (called_fnpd.varpos)
             info.node.lhs[0].lhs = nspace + funcname_array
 
         return # end of function marker
