@@ -16,9 +16,6 @@ def run_lexer(program):
             break      # No more input
         print(tok)
 
-def get_ast(program):
-    return
-
 def main():
     p= argparse.ArgumentParser(description="Quick and dirty jsfx2cpp")
 

@@ -297,7 +297,10 @@ def _flatten_multiple_assignments_in_expression (head_node):
 #-------------------------------------------------------------------------------
 def _make_key (name):
     assert(type(name) is list)
-    return '$'.join (name)
+    v = '$'.join (name)
+    while v.find('$$') != -1:
+        v = v.replace('$$', '$')
+    return v
 
 def _name_from_key (key):
     # The parser passes names as a list of strings encompassing namespace and
@@ -322,16 +325,65 @@ class Function:
     def __hash__ (self):
         return hash (str (self))
 
-class FunctionCall:
+class SolvedFunctionCall:
     def __init__(self, function_section, function_name, call_namespace):
         self.function = Function (function_name, function_section)
         self.call_namespace = call_namespace
-        self.instance_variable_refs = [] # variable names to pass on this call.
-        #self.assignment_to_tree = assignment_tree
+        self.instance_variable_refs = [] # instance variable names to pass on this call.
 
-    def append_required_instance_variables (self, traits):
+    def register_instance_variables (self, calling, calling_from = None):
         # Fills the extra function parameters needed to emulate JSFX "instance"
         # pseudo object orientation.
+        assert (type (calling) == FunctionTraits)
+        assert (calling_from is None or type (calling_from) == FunctionTraits)
+
+        if len (calling.instance) == 0 and  len (calling.inherited) == 0:
+            return [] # Called function uses no namespacing. No parameters.
+
+        variables = []
+        namespace = self.call_namespace
+
+        call_params = [_make_key([namespace, x]) for x in calling.instance]
+        call_params_i = [_make_key([namespace, x]) for x in calling.inherited]
+
+        if calling_from is None:
+            # Global scope call
+            for var in call_params + call_params_i:
+                variables.append (var)
+                self.instance_variable_refs.append (var)
+            return variables
+        else:
+            # Function scope call
+
+            matches_namespace = namespace == 'this' or \
+                calling_from.key_matches_on_instance_namespaces (namespace)
+
+            # here we prepend a dollar to instance variables avoid name clashes
+            # with locals and globals, notice that "_make_key" removes
+            # duplicated dollars.This is done too "FunctionTraits.add_variable".
+            for var in call_params + call_params_i:
+                var = var.replace ('this$', '')
+                var_pfx = _make_key(['$', var])
+
+                if var_pfx in calling_from.instance or \
+                    var_pfx in calling_from.inherited or \
+                    matches_namespace:
+                    # we check if the variable is a match on the instace or
+                    # inherited variables to check it isn't a Global before
+                    # adding a trailing '$'
+                    var = var_pfx
+
+                variables.append (var)
+                self.instance_variable_refs.append (var)
+            return variables
+
+    def __repr__(self):
+        s = self
+        return f'func:{s.function}, nspc:{s.call_namespace}, refs:{s.instance_variable_refs}'
+
+    def _get_unprefixed_call_params (self, traits):
+    # Fills the extra function parameters needed to emulate JSFX "instance"
+    # pseudo object orientation.
         assert (type (traits) == FunctionTraits)
         if len (traits.instance) == 0 and  len (traits.inherited) == 0:
             return [] # Called function uses no namespacing. No parameters.
@@ -340,22 +392,8 @@ class FunctionCall:
         namespace = self.call_namespace
         call_params = [_make_key([namespace, x]) for x in traits.instance]
         call_params_i = [_make_key([namespace, x]) for x in traits.inherited]
-        for var in call_params + call_params_i:
-            # avoid namespace to namespace concatentations. When functions are
-            # chaining calls to functions this can happen.
-            var = var.replace ('this$this$', 'this$')
-            if var.endswith ('$this$'):
-                # when assignments/reads happen directly on the namespace
-                # variable (this) inside a function we get "<variable>$this$".
-                var = var[:-len('$this$')]
-            variables.append (var)
-            self.instance_variable_refs.append (var)
+        return call_params + call_params_i
 
-        return variables
-
-    def __repr__(self):
-        s = self
-        return f'func:{s.function}, nspc:{s.call_namespace}, refs:{s.instance_variable_refs}'
 
 class Sections:
     # holds JSFX section info, variables, functions and function calls, etc.
@@ -372,7 +410,7 @@ class Sections:
             '_$numrefs' : {}, # use of variables on other sections
             #'_$str' : set(), # strings
             '_$func'    : {}, # FunctionTraits objects indexed by function name
-            '_$calls'   : {}, # FunctionCall objects indexed by node id
+            '_$calls'   : {}, # SolvedFunctionCall objects indexed by node id
         }
         self.order.append (section_name)
         # Add the new section to previously existing sections's variable refs
@@ -426,11 +464,11 @@ class Sections:
     def get_sections (self):
         return self.order
 
-    def add_call (self, section, node, call):
-        assert (type (call) == FunctionCall)
+    def add_global_scope_call (self, section, node, call):
+        assert (type (call) == SolvedFunctionCall)
         self.sd[section]['_$calls'][node.id] = call
         traits, _ = self.find_function_traits (section, call.function.name)
-        required_variables = call.append_required_instance_variables (traits)
+        required_variables = call.register_instance_variables (traits, None)
         for var in required_variables:
             self.classify_variable_reference (section, var)
 
@@ -499,7 +537,7 @@ class Sections:
                 # calls not done from a namespace get the fuction name
                 # as namespace.
                 namespace = namespace if namespace != '' else funcname
-                return FunctionCall (fsection, funcname, namespace)
+                return SolvedFunctionCall (fsection, funcname, namespace)
 
         return None # a call to some external function
 
@@ -530,7 +568,7 @@ class FunctionTraits:
         self.instance = [] # what is detected, keeping order
         self.parent_instance = []  # what is detected, keeping order (not impl)
         self.inherited = [] # inherited variables
-        self.calls = {} # contains FunctionCall indexed by node.id
+        self.calls = {} # contains SolvedFunctionCall indexed by node.id
 
     def key_matches_on_instance_namespaces (self, key):
             if key in self.instance_unchecked:
@@ -543,6 +581,11 @@ class FunctionTraits:
     def add_variable (self, name):
         idtype = 'default' # too lazy for an enum for this
 
+        # Notice that here we prepend a dollar to "this" and instance variables
+        # to avoid name clashes with locals and  globals, notice that
+        # "_make_key" removes duplicated dollars. This is done too on
+        # "SolvedFunctionCall.register_instance_variables"
+
         if name[0] == 'this':
             if len(name) > 1:
                 if name[1] == '..':
@@ -550,6 +593,8 @@ class FunctionTraits:
                     idtype = 'parent_instance'
                 else:
                     idtype = 'instance'
+                    #name = name[1:]
+                    name[0] = '$'
             else:
                 idtype = 'instance'
                 name = ['this$']
@@ -561,10 +606,12 @@ class FunctionTraits:
                 return name
             if key in self.local:
                 return name
+
             if self.key_matches_on_instance_namespaces (key):
-                if key not in self.instance:
-                    self.instance.append (key)
-                return name
+                ikey = '$' + key
+                if ikey not in self.instance:
+                    self.instance.append (ikey)
+                return ['$'] + name
             if key not in self.globals:
                 self.globals.append (key)
             return name
@@ -578,18 +625,19 @@ class FunctionTraits:
             # functionality is in place
             raise NotImplementedError (".. on identifiers not implemented")
             self.parent_instance.add (key)
+
         return name
 
-    def add_call (self, node, called, called_traits):
+    def add_call (self, node, calling, calling_traits):
           # NOTICE: parent declarations by this.. are not implemented. My
           # intention is to avoid them.
         assert (type (node) == Node)
-        assert (type (called) == FunctionCall)
-        assert (type (called_traits) == FunctionTraits)
+        assert (type (calling) == SolvedFunctionCall)
+        assert (type (calling_traits) == FunctionTraits)
 
-        self.calls[node.id] = called
+        self.calls[node.id] = calling
         instance_vars = \
-            called.append_required_instance_variables (called_traits)
+            calling.register_instance_variables (calling_traits, self)
 
         if len (instance_vars) == 0:
             return # Function uses no namespacing
@@ -600,14 +648,14 @@ class FunctionTraits:
         # Not adding the same parameters twice. E.g. on: x.f(); x.f();
         #
         # Notice that parameters can alias too, e.g. x.f(); x.y(); can
-        # have both forward down a parameter called "x", so a parameter
+        # have both forward down a parameter calling "x", so a parameter
         # is not needed twice even if it comes from different functions.
         #
         # This is exactly the reason why making structs of all the
         # instance parameters is a bad idea.
 
-        if self.key_matches_on_instance_namespaces (called.call_namespace) or \
-            called.call_namespace == 'this':
+        if self.key_matches_on_instance_namespaces (calling.call_namespace) or \
+            calling.call_namespace == 'this':
             # Inherited variables will be forwarded down to the caller of this
             # function (the one pointed to self). Parameters will added to this
             # function signature as passed-by-reference.
@@ -619,10 +667,10 @@ class FunctionTraits:
                 self.inherited.append (variable)
         else:
             # New global variables with the name of the namespace they were
-            # called from. e.g. "x.f() -> creates globals called x.<whatever>"
+            # calling from. e.g. "x.f() -> creates globals calling x.<whatever>"
             #
             # Reminder, the namespace is the function name if the function was
-            # called without namespace (e.g. f() ).
+            # calling without namespace (e.g. f() ).
             #
             # Notice that on JSFX "local" variables don't participate on
             # namespacing. We don't need to check on self.local
@@ -634,7 +682,7 @@ class FunctionTraits:
     def get_dependencies (self):
         deps = set()
         for _, call in self.calls.items():
-            assert (type (call) == FunctionCall)
+            assert (type (call) == SolvedFunctionCall)
             deps.add (call.function)
         return deps
 
@@ -656,7 +704,7 @@ def _register_functions_and_non_function_global_vars (sections, head_node):
     # The implementation will be based on single global variables and passing
     # the extra instance parameters to functions as C++ references.
     #
-    # These parameters will get stored on FunctionCall objects, stored on
+    # These parameters will get stored on SolvedFunctionCall objects, stored on
     # dictionaries indexed by Node id, so the code generator can easily find
     # them.
     #
@@ -731,7 +779,8 @@ def _register_functions_and_non_function_global_vars (sections, head_node):
                 )
             if call is None:
                 return
-            state.sections.add_call (info.state.section, info.node, call)
+            state.sections.add_global_scope_call(
+                info.state.section, info.node, call)
 
     def function_visitor_detect_vars (info, state):
         assert (type (info) == VisitorInfo)
@@ -765,7 +814,7 @@ def _register_functions_and_non_function_global_vars (sections, head_node):
         if not called:
             # E.g. calling some JSFX function that has to be emulated
             return
-        assert (type (called) == FunctionCall)
+        assert (type (called) == SolvedFunctionCall)
         thisfunc, _ = state.sections.find_function_traits(
             info.state.section, state.function_key
             )
@@ -1484,7 +1533,7 @@ def _generate_cpp (ast, codegen_context):
             assert (traits is not None)
             local_params     = ['double ' + p[0] for p in id_list.lhs]
             inherited_params = traits.instance + traits.inherited
-            inherited_params = ['double& ' + p for p in inherited_params]
+            inherited_params = ['double&' + p for p in inherited_params]
             parameters = local_params + inherited_params
             csv = [','] * (len (parameters) * 2 - 1)
             csv[0::2] = parameters
@@ -1546,6 +1595,7 @@ def _generate_cpp (ast, codegen_context):
                     [call.function.section, call.function.name])
             state.add_code (f'{call_key} (')
 
+            # visit parameter list
             expr_last = len (info.node.rhs) - 1
             for idx, expr in enumerate (info.node.rhs):
                 info = VisitorInfo (expr, info.node, parent_info=info)

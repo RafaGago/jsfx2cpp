@@ -1,0 +1,35 @@
+@init
+
+/*This was buggy because of the "this" parameter renaming*/
+
+function f() (
+    this.x = 0;
+);
+
+function f2() (
+    y.f();
+    a = y.x;
+);
+
+function f3() (
+    this.x = 3;
+);
+
+function f4() (
+    this.x = 3;
+    this.f3();
+);
+
+function f5(x) (
+    this.x = x; /* Shouldn't name-clash with the "x" parameter*/
+);
+
+function f6() local (x)(
+    x = 3;
+    this.x = x; /* Shouldn't name-clash with the "x" local*/
+);
+
+f2(); /* "a" -> global. "y.x" (global) */
+f4(); /* should be only receiving x. testing for variable merging. */
+f5(2); /* no name clashes!. */
+f6(); /* no name clashes!. */

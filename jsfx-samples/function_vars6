@@ -14,6 +14,8 @@ function f3() local(x) (
   x.c = 3;
 );
 
-f1(); // x.y = 4, x.z = 3 (globals both)
-f2(); // f2.x.a = 4, x.b = 3 (global)
-f3(); // f3.x = 4; x.c = 3 (global)
+/* this tests that local(x) doesn't imply namespaces, just full variables */
+
+f1(); /* x.y = 4, x.z = 3 (globals both) */
+f2(); /* f2.x.a = 4, x.b = 3 (global) */
+f3(); /* f3.x = 4; x.c = 3 (global) */

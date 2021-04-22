@@ -15,4 +15,7 @@ function f2w (x) (
         : (this.f2 (x););
 );
 
+/* this tests that the amount of generated parameters is correctly searched
+for duplication */
+
 w.f2w (2);
