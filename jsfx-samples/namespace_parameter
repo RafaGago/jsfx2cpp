@@ -1,12 +1,12 @@
 @init
-function f2 (x*) (
+function f (x*) (
     x.y;
 );
 
-function f (x*) local (n) (
+function f2 (x*) local (n) (
     x.y = 3;
     x.z = 4;
-    f2(x);
+    f(x);
     n = pow (f2(x), 4.);
     n = pow (f2(paco), 4.);
 );

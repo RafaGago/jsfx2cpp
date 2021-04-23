@@ -1,0 +1,26 @@
+@init
+
+function f1(v, namesp1*) (
+	namesp1.a1 = v;
+    v
+);
+
+function f2(x, namesp2*) local (y)(
+	namesp2.v ? (
+		y = f1(x, namesp2.y);
+	);
+	y;
+);
+
+function f3() (
+	this.a += this.b;
+);
+
+function f4(nms*) (
+	nms.x.f3();
+);
+
+/* namespace propagation into chained calls */
+f2(0, paco);
+f4(paco2); /**/
+f3();

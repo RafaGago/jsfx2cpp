@@ -1,0 +1,13 @@
+@init
+
+/* Double namespacing on "this" and a call */
+
+function f() (
+    this.x = 0;
+);
+
+function f2() (
+    this.y.f();
+);
+
+f2(); /* f2.y.x */

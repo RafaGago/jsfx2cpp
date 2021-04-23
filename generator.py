@@ -355,7 +355,7 @@ class SolvedFunctionCall:
         else:
             # Function scope call
 
-            matches_namespace = namespace == 'this' or \
+            matches_namespace = namespace.startswith ('this') or \
                 calling_from.key_matches_on_instance_namespaces (namespace)
 
             # here we prepend a dollar to instance variables avoid name clashes
@@ -655,7 +655,7 @@ class FunctionTraits:
         # instance parameters is a bad idea.
 
         if self.key_matches_on_instance_namespaces (calling.call_namespace) or \
-            calling.call_namespace == 'this':
+            calling.call_namespace.startswith ('this'):
             # Inherited variables will be forwarded down to the caller of this
             # function (the one pointed to self). Parameters will added to this
             # function signature as passed-by-reference.
@@ -2412,7 +2412,8 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
     class VisitData:
         def __init__(self):
             self.reset ([], None)
-            self.fnpd_map = {}
+            self.fnpd_map = {} # function with namespace parameter
+            self.regfn_map = {} # regular function
 
         def reset (self, funcname, fpnd):
             assert(
@@ -2468,14 +2469,44 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
             for fnpd in visitdata.fnpd_map.values():
                 funckey = _make_key (fnpd.funcname_array)
                 if callkey.endswith (funckey):
-                    # function has a namespace parameter
+                    # call to a function with a namespace parameter
                     funcname_array = fnpd.funcname_array
                     called_fnpd = fnpd
+                    break
 
             if called_fnpd is None:
-                # the called function has no namespace parameters, pass
+                # the called function has no namespace parameters, call through
+                # "this" if:
+                #  -it contains the identifier of the namespace param on the
+                #   call.
+                #  -it isn't a builtin.
+                #  -we are at function scope.
+                if visitdata.fnpd is None:
+                    # not in a function. Skip.
+                    return
+                fname = None
+                nspace_key = _make_key(visitdata.fnpd.varname_array)
+                if not callkey.startswith (nspace_key):
+                    # namespace variable on this function not appearing on the
+                    # call
+                    return
+
+                for fnkey, fnarr in visitdata.regfn_map.items():
+                    if callkey.endswith (fnkey):
+                        # A function found
+                        funcname_array = fnpd.funcname_array
+                        fname = fnarr
+                        break
+                if fname is None:
+                    # Builtin jsfx function or similar
+                    return
+
+                callname_array = \
+                    callname_array[len (visitdata.fnpd.varname_array):]
+                info.node.lhs[0].lhs = ['this'] + callname_array
                 return
 
+            # call to a function with a namespace parameter (continuation)
             if callname_array[0] == 'this':
                 raise RuntimeError(
                     f'error when replacing namespace variable {called_fnpd.varname} on {callkey} by a namespaced call: "this" already present')
@@ -2502,11 +2533,16 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
                     if node.type != 'identifier':
                         continue
 
-                    if _make_key (node.lhs) != \
-                            _make_key (visitdata.fnpd.varname_array):
+                    if len (node.lhs) < len (visitdata.fnpd.varname_array):
                         continue
 
-                    nspace = ['this']
+                    cmp_len = len (visitdata.fnpd.varname_array)
+                    node_cmp = node.lhs[:cmp_len]
+
+                    if node_cmp != visitdata.fnpd.varname_array:
+                        continue
+
+                    nspace = ['this'] + node.lhs[cmp_len:]
                     # the parameter is passed to another function with namespace
                     # parameters. Assert that indexes match.
                     assert (idx == called_fnpd.varpos)
@@ -2533,6 +2569,9 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
 
         id_list = node.lhs[1]
         if len (id_list.lhs) == 0:
+            # No namespace params: regular function
+            funcname_array = node.lhs[0].lhs
+            visit_data.regfn_map[_make_key (funcname_array)] = funcname_array
             continue
 
         for idx, identifier in enumerate (id_list.lhs):
@@ -2545,6 +2584,9 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
                 namespace_param_pos = idx
 
         if namespace_params == 0:
+            # No namespace params: regular function
+            funcname_array = node.lhs[0].lhs
+            visit_data.regfn_map[_make_key (funcname_array)] = funcname_array
             continue
 
         if namespace_params > 1:

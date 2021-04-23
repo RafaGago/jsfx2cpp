@@ -1,0 +1,30 @@
+@init
+
+function f1() (
+    // global variable
+    g = 0;
+	1;
+);
+
+function f2() (
+	2;
+);
+
+function f3() (
+	2;
+);
+
+function f4() (
+	f2();
+);
+
+@block
+
+function f5() (
+    f3();
+);
+
+@sample
+
+f4();
+f5();
