@@ -2243,8 +2243,7 @@ def _process_slider_code_section (ast, slider_section_code):
         slider = Slider (line)
         sliders[slider.var] = slider
 
-    for name in sliders.keys():
-        sld = sliders[name]
+    for sld in sliders.values():
         slider_assign_nodes.append(
             Node(
                 '=',
@@ -2281,7 +2280,15 @@ static constexpr auto get_parameter({sld.var}_tag) {{
 }}
 
 #endif''')
-    # inject slider default values on the init section
+
+    paramtags =','.join ([sld.var + '_tag' for sld in sliders.values()])
+    slider_code_blocks.append(f'''
+#if 1
+#else
+    // Snippet for parameter boilerplate in the authors framework....
+    using parameters = mp11::mp_list<{paramtags}>;
+#endif''')
+
     assert (ast.type == 'seq')
 
     seq = ast.lhs
