@@ -346,9 +346,17 @@ class SolvedFunctionCall:
         call_params = [_make_key([namespace, x]) for x in calling.instance]
         call_params_i = [_make_key([namespace, x]) for x in calling.inherited]
 
+        def remove_trailing_this(v):
+            if v.endswith('$this$') and v != '$this$':
+                # special case. Assigning a namespace variable directly
+                return v[:-len('$this$')]
+            return v
+
         if calling_from is None:
             # Global scope call
             for var in call_params + call_params_i:
+                var = remove_trailing_this (var)
+                var.replace
                 variables.append (var)
                 self.instance_variable_refs.append (var)
             return variables
@@ -362,6 +370,7 @@ class SolvedFunctionCall:
             # with locals and globals, notice that "_make_key" removes
             # duplicated dollars.This is done too "FunctionTraits.add_variable".
             for var in call_params + call_params_i:
+                var = remove_trailing_this (var)
                 var = var.replace ('this$', '')
                 var_pfx = _make_key(['$', var])
 

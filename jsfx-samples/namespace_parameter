@@ -15,6 +15,11 @@ function f3 (a, x*) (
     x.y = a;
 );
 
+function f4 (x*) (
+    x = 3; /* should assign directly at the passed variable */
+);
+
 f(paco);
 f2(paco);
 f3(1, paco);
+f4(paco);
