@@ -1,6 +1,7 @@
 slider1:param_a=0.5<0,1>-Param B
 slider2:param_b=0.5<0,1>-Param A
-
+slider3:Stereo_Mode=<0,1,1{Mid/Side,Left/Right}>-Stereo Mode
+/*this slider (3) was giving problems. */
 @init
 
 x = param_a + param_b

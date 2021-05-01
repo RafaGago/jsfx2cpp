@@ -48,5 +48,5 @@ Non-deliberate known issues/omissions:
   correct JSFX code would never do that. Just add explicit 0's for missing
   parameterson the generated code.
 
-* Generated (because of namespace usage) function parameter variable names can
-  collide. Everything is fine at the call site.
+* Comments are a bit flaky. If some file doesn't work because of the comments
+  just temporarily remove them.

@@ -117,6 +117,8 @@ def _tree_visit_side(side, vnew, visitor, state, parentinfo, on_lhs):
     last_state = parentinfo.state
     for idx, n in enumerate (side):
         if type (n) != Node:
+            print (n)
+            print ("-------------------")
             print (parentinfo.parent)
             assert(False)
         last = len (side) - 1
@@ -1455,7 +1457,9 @@ def _generate_cpp (ast, codegen_context):
             'loop',
             'loop-eval-result',
             'loop-counter',
-            'parameter_pack',
+            'parameter_pack'
+            'nop',
+            'comment',
             ]
         if info.node.type in manually_handled:
             return VisitType.NODE_ONLY
@@ -1488,6 +1492,10 @@ def _generate_cpp (ast, codegen_context):
             # This code does many manual calls of the visitor, so it keeps
             # track of the current section by itself.
             state.enter_section (info.node.lhs)
+            return
+
+        if info.node.type == 'comment':
+            state.add_code (f'/* {info.node.lhs[0].lhs[0]} */')
             return
 
         if info.node.is_bottom:
@@ -2179,9 +2187,9 @@ def _generate_class_file(
     return ' '.join (ret)
 #-------------------------------------------------------------------------------
 class Slider:
-    def __init__(self, code):
+    def __init__(self, code_in):
         def do_raise():
-            raise RuntimeError(f'invalid slider format: {code}')
+            raise RuntimeError(f'invalid slider format: {code_in}')
 
         # ignoring  .wav, .txt, .ogg, or .raw files scan sliders for now
         # https://www.reaper.fm/sdk/js/js.php#js_file
@@ -2189,7 +2197,9 @@ class Slider:
         # slider1:0<-100,6,1>Wet Mix (dB)
         # slider1:wet_db=-12<-60,12>-Wet (dB)
         # slider8:0,Output frequency (Hz)
-        self.line = code
+        code = str (code_in).replace('=<', '=0<')
+        self.line = code_in
+
         remainder = code.strip().split (':')
         if len (remainder) == 2:
             self.id = remainder[0].strip()
@@ -2624,6 +2634,36 @@ def _replace_single_parameter_namespaces_by_namespaced_calls (ast):
 
     # The actual replacement is done on the visitor
     _tree_visit (VisitorInfo (ast), visiting_new, visitor_body, visit_data)
+
+#-------------------------------------------------------------------------------
+def _reset_node_to_comment (node, text):
+    comment = Node ("string_literal", text, bottom = True)
+    node.reset ('comment', [comment])
+
+#-------------------------------------------------------------------------------
+def _remove_string_functions (head_node):
+    # There is no support for string ops, Remove them.
+
+    def visiting_new (info, _):
+        assert (type (info) == VisitorInfo)
+        if info.node.type == 'strcpy' or info.node.type == 'strcat':
+            return VisitType.NODE_ONLY
+        else:
+            return VisitType.NODE_FIRST
+
+    def visitor (info, _):
+        assert (type (info) == VisitorInfo)
+        if info.node.type == 'strcpy' or info.node.type == 'strcat':
+            _reset_node_to_comment (info.node, f'removed "{info.node.type}"')
+
+        if info.node.type == 'call':
+            assert (info.node.lhs[0].type == 'identifier')
+            name = info.node.lhs[0].lhs[0]
+            if name == 'strcpy' or name == 'strcat':
+                _reset_node_to_comment (info.node, f'removed "{name}"')
+
+    _tree_visit (VisitorInfo (head_node), visiting_new, visitor)
+
 #-------------------------------------------------------------------------------
 def generate(
     ast,
@@ -2636,6 +2676,7 @@ def generate(
 
     runtime_header, lib_funcs = _generate_runtime_environment()
     slider_snippets = _process_slider_code_section (ast, slider_section_code)
+    _remove_string_functions (ast)
     _suffix_function_overloads_with_a_substring (ast)
     _replace_single_parameter_namespaces_by_namespaced_calls (ast)
     _append_external_library_functions (lib_funcs, libfunc_files)
