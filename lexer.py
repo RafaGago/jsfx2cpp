@@ -124,6 +124,12 @@ def t_ONELINE_COMMENT(p):
     r'\/\/[^\n\r]+?(?:\*\)|[\n\r])'
     pass
 
+
+# \/\/.*$         /* comment */
+def t_EMPTY_ONELINE_COMMENT(p):
+    r'\/\/[\n\r]'
+    pass
+
 # "/*"            { comment(yyscanner); }
 #
 # .       return (int)yytext[0];
