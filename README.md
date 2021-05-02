@@ -39,8 +39,9 @@ Non-deliberate known issues/omissions:
 
 * Only single function namespaces. E.g. fn(namespace*). The current
   implementation is based on substituting by "this" and namespace calls when
-  possible. This JSFX features was found very late on the development cycle after successfully parsing  many non-trivial JSFX scripts. It is a non documented a
-  seldomly used feature.
+  possible. This JSFX features was found very late on the development cycle
+  after successfully parsing  many non-trivial JSFX scripts. It is a non
+  documented a seldomly used feature.
 
 * Another feature I found very late. On JSFX calling a function with less
   parameters than the function expects succeeds by defaulting missing parameters
@@ -49,4 +50,7 @@ Non-deliberate known issues/omissions:
   parameterson the generated code.
 
 * Comments are a bit flaky. If some file doesn't work because of the comments
-  just temporarily remove them.
+  just temporarily remove them. PLY uses regexes for lexing, which doesn't play
+  well. This could just be fixed by doing it on the preprocessing stage. At some
+  point it could be interesting for the source's comments to make it to the
+  generated code.

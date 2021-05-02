@@ -504,6 +504,15 @@ def p_id_list_identifier_2(p):
     p[1].lhs[0] = p[1].lhs[0] + '*'
     p[0] = p[1]
 
+def p_id_list_identifier_3(p):
+    '''id_list_identifier : ',' identifier'''
+    p[0] = p[2]
+
+def p_id_list_identifier_4(p):
+    '''id_list_identifier : ',' identifier '*' '''
+    p[2].lhs[0] = p[2].lhs[0] + '*'
+    p[0] = p[2]
+
 def p_id_list_1(p):
     '''id_list :'''
     p[0] = Node ("id_list",  [], bottom=True)
@@ -513,14 +522,14 @@ def p_id_list_2(p):
     p[0] = Node ("id_list",  [p[1].lhs], line=p.lineno (1), bottom=True)
 
 def p_id_list_3(p):
-    '''id_list : id_list ',' id_list_identifier'''
+    '''id_list : id_list id_list_identifier'''
     if type(p[1]) is Node and p[1].type == 'id_list':
-        p[1].lhs.append(p[3].lhs);
+        p[1].lhs.append(p[2].lhs);
         p[0] = p[1]
     else:
         p[0] = Node(
             "id_list",
-             [p[1].lhs, p[3].lhs],
+             [p[1].lhs, p[2].lhs],
              line=p.lineno (1),
              bottom=True)
 
