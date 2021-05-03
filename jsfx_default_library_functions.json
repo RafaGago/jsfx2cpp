@@ -3,7 +3,6 @@
     "min" :  {"to": "std::min",   "headers": ["algorithm"]},
     "pow" :  {"to": "std::pow",   "headers": ["cmath"]},
     "exp" :  {"to": "std::exp",   "headers": ["cmath"]},
-    "sqr" :  {"to": "std::sqrt",  "headers": ["cmath"]},
     "sqrt":  {"to": "std::sqrt",  "headers": ["cmath"]},
     "cbrt":  {"to": "std::cbrt",  "headers": ["cmath"]},
     "sin" :  {"to": "std::sin",   "headers": ["cmath"]},
@@ -19,6 +18,15 @@
     "log" :  {"to": "std::log",   "headers": ["cmath"]},
     "log10": {"to": "std::log10", "headers": ["cmath"]},
     "abs" :  {"to": "std::abs",  "headers": ["cmath"]},
+    "sqr": {
+        "to": "jsfx_sqr",
+        "headers": [""],
+        "definition" : [
+            "static double jsfx_sqr (double v) {",
+            "  return v * v;",
+            "}"
+        ]
+    },
     "rand": {
         "to": "jsfx_rand",
         "headers": ["cstdlib"],
