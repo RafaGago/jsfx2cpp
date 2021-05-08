@@ -255,9 +255,10 @@ def _flatten_multiple_assignments_in_expression (head_node):
             equals = _query (node, lambda info: info.node.type == '=')
             if len (equals) > 0:
                 # some assignments, we do a conversion to a sequence
-                node = Node ("seq", [node], line=node.line)
+                prev = deepcopy (node)
+                node.reset ("seq", [prev], line=prev.line)
 
-    def visiting_new(info, _):
+    def visiting_new (info, _):
         assert (type (info) == VisitorInfo)
         # converting some of the children expressions on these constructs to
         # sequences when traveling down the tree. This is for an easier
@@ -301,7 +302,7 @@ def _flatten_multiple_assignments_in_expression (head_node):
 
         for i in range (0, flat_count):
             info = assignments[i]
-            assert(info.node.type == '=')
+            assert (info.node.type == '=')
 
             # assignment on previous statement
             copy = info.node.copy() # updates parents

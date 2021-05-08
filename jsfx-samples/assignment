@@ -3,3 +3,8 @@
 //data = (x = 0);
 //data *= 1;
 rata = a = b = c = d = e = f = 1;
+
+// this was buggy, the last "e=0" went outside of the conditional
+j ? (
+    j;
+) : y0 = y1 = e = 0;
