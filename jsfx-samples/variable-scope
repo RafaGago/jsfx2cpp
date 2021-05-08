@@ -1,0 +1,25 @@
+
+@init
+
+@block
+
+function f(x)(
+    x;
+);
+
+!x ? (
+  y ? (
+    n = 1;
+  );
+);
+
+// n should be a global
+!x ? (
+  f(n);
+);
+
+// j should be local
+!x ? (
+  j = 3;
+  f (j);
+);

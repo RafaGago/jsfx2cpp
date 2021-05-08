@@ -41,16 +41,18 @@ class VisitorInfo:
         if parent_info is not None:
             parent = parent_info.node
             self.stack = [node] + parent_info.stack
+            self.on_lhs_stack = [on_lhs] + parent_info.on_lhs_stack
             self.state = parent_info.state
         else:
             if parent is None:
                 parent = Node ('virtual-parent', [node])
             self.stack = [node, parent]
+            self.on_lhs_stack = [on_lhs, True]
             self.state = VisitorGlobalState() if state is None else state
 
         self.node      = node # alias for self[0] or self.stack[0]
         self.parent    = parent # alias for self[0] or self.stack[1]
-        self.on_lhs    = on_lhs
+        self.on_lhs    = on_lhs # alias for self.on_lhs_stack[0]
         self.idx       = idx
         self.last_idx  = last
 
@@ -60,6 +62,23 @@ class VisitorInfo:
         if size < minsize:
             ret += [''] * (minsize - size)
         return ret
+
+    def stack_get_idx_of_node_with_type (self, typ):
+        st = self.get_node_type_stack()
+        try:
+            idx = st.index (typ)
+            return idx
+        except:
+            return -1
+
+    def stack_get_idx_of_last_node_with_type (self, typ):
+        st = self.get_node_type_stack()
+        st.reverse()
+        try:
+            idx = st.index (typ)
+            return len (st) - idx - 1
+        except:
+            return -1
 
     def node_type_seq_match (self, offset, sequences):
         minsize = len (max (sequences, key=len))
@@ -1755,17 +1774,20 @@ class SectionVariables:
     def __init__ (self, variables, external_refs):
         self.local = set()
         self.glbal = set() # python reserves words in a very annoying way
+        self.if_assigned = {} # first assigned on a conditional.
         self.unclassified = set (variables)
         self.refs = external_refs
 
     def finished_classifying(self):
         self.glbal |= self.unclassified
+        self.local |= self.if_assigned.keys()
         self.unclassified = None
 
 class ClassifiedVariables:
     def __init__ (self, sections):
         assert (type (sections) == Sections)
         self.vars = {}
+        self.sections = sections
         for name in sections.get_sections():
             self.vars[name] = SectionVariables(
                 sections.get_variables (name),
@@ -1793,17 +1815,71 @@ def _classify_variable_scope (head_node, sections):
         assert (type (info) == VisitorInfo)
         assert (type (classify) == ClassifiedVariables)
 
+        def get_last_if_info (inf):
+            last_if = inf.stack_get_idx_of_last_node_with_type ('if')
+            if last_if >= 0:
+                return inf.on_lhs_stack[last_if], inf.stack[last_if].id
+            else:
+                return None, None
+
+        def matches_assignment_if (secv, varname, if_id, if_on_lhs):
+            cond = secv.if_assigned.get (varname)
+            return cond and \
+                cond['if-node-id'] == if_id and \
+                cond['if-on-lhs'] == if_on_lhs
+
+        secvars = classify.vars.get (info.state.section)
+
+        if info.node.type == 'call':
+            #  When trying to understand this visitor skip this branch first.
+            #
+            # This branch handles the "corner" case of variables assigned on
+            # a conditional that are part of the instance variables of a
+            # function, e.g.
+            #
+            # function f1(x) (this.y += x;);
+            # (j) ? (nmspc.y = 0;);
+            # nmspc.f1(3);
+            #
+            # In this example "nmspc.y" is initialized in a branch and used on
+            # the "nmspc.f1" call. Without this branch that handles instance
+            # variables "nmspc.y" would be detected as a local/stateless
+            # variable, as that variable doesn't appear on the AST. We have to
+            # do a lookup.
+            #
+            # This implementation, doesn't travel the function hierarchy to know
+            # if this type of cases are assigned first, instance variables are
+            # always assumed as read/global/stateful. Doing it better would be
+            # more complex.
+            call, _ = classify.sections.find_call(
+                info.state.section, info.node)
+            if call is None:
+                # call to some JSFX function or something not known.
+                return
+
+            last_if_id, last_if_on_lhs = get_last_if_info (info)
+            for var in call.instance_variable_refs:
+                if last_if_id is not None and matches_assignment_if(
+                    secvars, var, last_if_id, last_if_on_lhs):
+                    # The instance variable returned by the function was already
+                    # assigned first on this branch.
+                    continue
+                if var in secvars.if_assigned:
+                    secvars.glbal.add (var)
+                    secvars.if_assigned.pop (var, None)
+
+            return
+
         if info.node.type != 'identifier':
             return
 
         var = _make_key (info.node.lhs)
-        secvars = classify.vars.get (info.state.section)
         if secvars is None:
             assert (False) # BUG!
             return
 
-        if var not in secvars.unclassified:
-            # Either a function or an already classified variable
+        if var not in secvars.unclassified and var not in secvars.if_assigned:
+            # Either a function name or an already classified variable
             return
 
         if info.parent.type == '=' and info.on_lhs and var not in secvars.refs:
@@ -1819,12 +1895,46 @@ def _classify_variable_scope (head_node, sections):
                 return _make_key (qinfo.node.lhs) == var
 
             has_var_on_rhs = _query (info.parent.rhs[0], has_var)
+            last_if_id, last_if_on_lhs = get_last_if_info (info)
+
             if len (has_var_on_rhs) == 0:
-                secvars.local.add (var)
+                # On LHS, variable is assigned.
+                if last_if_id is None:
+                    # not on a conditional, we can assume the variable is
+                    # definitely a local
+                    secvars.local.add (var)
+                else:
+                    # On a conditional, this variable may not be a local. We
+                    # won't be doing an analysis of all branches, so as of now
+                    # we add it on "if_assigned", a list waiting for further
+                    # decision that keeps track on which conditional a variable
+                    # appeared last on the left hand side of an assignment.
+                    secvars.if_assigned[var] = {
+                        'if-node-id' : last_if_id,
+                        'if-on-lhs': last_if_on_lhs
+                    }
+            else:
+                # On RHS, variable is read.
+                if matches_assignment_if(
+                    secvars, var, last_if_id, last_if_on_lhs):
+                    # this variable was previously assigned on this same
+                    # conditional, not known if this variable is local or global
+                    # yet. Deferring the decision.
+                    pass
+                else:
+                    secvars.glbal.add (var)
+                    secvars.if_assigned.pop (var, None)
+        else:
+            last_if_id, last_if_on_lhs = get_last_if_info (info)
+            if matches_assignment_if(
+                secvars, var, last_if_id, last_if_on_lhs):
+                # this conditional started with an assignment, not known if
+                # this variable is a local or a global yet.
+                pass
             else:
                 secvars.glbal.add (var)
-        else:
-            secvars.glbal.add (var)
+                secvars.if_assigned.pop (var, None)
+
         secvars.unclassified.discard (var)
 
     classify_state = ClassifiedVariables (sections)
