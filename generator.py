@@ -2235,7 +2235,7 @@ def _generate_class_file(
 
     # ommitting slider header
     # ret += external_header
-    ret += ['\nstruct jsfx_process {']
+    ret += ['\class jsfx_process {\n', 'private:\n']
     add_separator (ret)
     ret += global_runtime
     add_separator (ret)
@@ -2243,6 +2243,7 @@ def _generate_class_file(
     add_separator (ret)
     ret += specialvar
     add_separator (ret)
+    ret += ['public:\n']
     ret += slider_funcs
     for section in section_order:
         newvars = []
@@ -2259,6 +2260,7 @@ def _generate_class_file(
 
         add_separator (ret)
         ret += [f'// global/stateful variables for section "{section}"\n']
+        ret += ['private:\n']
         ret += [f'double {v};' for v in sorted (newvars)]
         add_separator (ret)
         ret += [f'void init_{section}_variables()\n{{']
@@ -2269,6 +2271,7 @@ def _generate_class_file(
     ret += ['jsfx_process() {jsfx_process_reset();}\n']
     for section in section_order:
         add_separator (ret)
+        ret += ['private:\n']
         funcname = "jsfx_process_reset" if section == GLOBAL_Section else section
         ret += [f'void {funcname}(){{']
         if section != GLOBAL_Section:
@@ -2292,6 +2295,7 @@ def _generate_class_file(
 
         if len (fns) > 0:
             ret += [f'\n// functions for section "{section}"\n']
+            ret += ['private:\n']
             ret += fns
 
     ret += ['}; /* jsfx_process */ ']
