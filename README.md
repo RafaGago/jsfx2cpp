@@ -1,3 +1,12 @@
+Notice
+======
+
+I'm leaving Github. The main official location for this project is now:
+https://codeberg.org/RafaGago/jsfx2cpp
+
+jsfx2cpp
+========
+
 An aid in manually converting Reaper's JSFX (interpreted code)to C++.
 
 TL; DR
